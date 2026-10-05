@@ -62,35 +62,56 @@ function drawGlow(
   ctx.drawImage(glowSprite(color, radius), x - r, y - r, r * 2, r * 2);
 }
 
-function backgroundTile(): HTMLCanvasElement {
-  return sprites.get("bg", BG_SIZE, BG_SIZE, (ctx) => {
+function ambientTexture(): HTMLCanvasElement {
+  return sprites.get("ambient", BG_SIZE, BG_SIZE, (ctx) => {
     let s = 987654321;
     const rand = (): number => {
       s = (s * 1103515245 + 12345) & 0x7fffffff;
       return s / 0x7fffffff;
     };
+
+    const blobs: number[][] = [];
     for (let i = 0; i < 14; i++) {
-      const cx = rand() * BG_SIZE;
-      const cy = rand() * BG_SIZE;
-      const r = 120 + rand() * 220;
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      grad.addColorStop(0, "rgba(234, 251, 224, 0.05)");
-      grad.addColorStop(1, "rgba(234, 251, 224, 0)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      blobs.push([rand() * BG_SIZE, rand() * BG_SIZE, 120 + rand() * 220]);
     }
-    ctx.strokeStyle = "rgba(220, 245, 205, 0.045)";
-    ctx.lineWidth = 1.5;
+    const rings: number[][] = [];
     for (let i = 0; i < 10; i++) {
-      const cx = rand() * BG_SIZE;
-      const cy = rand() * BG_SIZE;
-      const r = 40 + rand() * 120;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
-      ctx.stroke();
+      rings.push([rand() * BG_SIZE, rand() * BG_SIZE, 40 + rand() * 120]);
+    }
+
+    const offsets = [-BG_SIZE, 0, BG_SIZE];
+    for (const [cx, cy, r] of blobs) {
+      for (const ox of offsets) {
+        for (const oy of offsets) {
+          const grad = ctx.createRadialGradient(
+            cx + ox,
+            cy + oy,
+            0,
+            cx + ox,
+            cy + oy,
+            r,
+          );
+          grad.addColorStop(0, "rgba(234, 251, 224, 0.05)");
+          grad.addColorStop(1, "rgba(234, 251, 224, 0)");
+          ctx.fillStyle = grad;
+          ctx.fillRect(cx + ox - r, cy + oy - r, r * 2, r * 2);
+        }
+      }
+    }
+
+    ctx.strokeStyle = "rgba(220, 245, 205, 0.04)";
+    ctx.lineWidth = 1.5;
+    for (const [cx, cy, r] of rings) {
+      for (const ox of offsets) {
+        for (const oy of offsets) {
+          ctx.beginPath();
+          ctx.arc(cx + ox, cy + oy, r, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(cx + ox, cy + oy, r * 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
     }
   });
 }
@@ -125,6 +146,8 @@ export function render(
   const { width, height } = camera;
   const scale = camera.scale * (1 + camera.kick);
 
+  drawBackground(ctx, camera, state.time);
+
   ctx.save();
   ctx.translate(width / 2, height / 2);
   ctx.scale(scale, scale);
@@ -139,7 +162,6 @@ export function render(
     y1: camera.y + halfH,
   };
 
-  drawBackground(ctx, state.time, view);
   drawGoal(ctx, goal, state.time);
   particles.draw(ctx, view);
   drawBeams(ctx, world, state.time, view);
@@ -196,18 +218,22 @@ export function render(
 
 function drawBackground(
   ctx: CanvasRenderingContext2D,
+  camera: Camera,
   time: number,
-  view: View,
 ): void {
-  const tile = backgroundTile();
-  const drift = (time * 8) % BG_SIZE;
-  const startX = Math.floor((view.x0 - drift) / BG_SIZE) * BG_SIZE + drift;
-  const startY = Math.floor((view.y0 - drift) / BG_SIZE) * BG_SIZE + drift;
-  for (let x = startX; x < view.x1; x += BG_SIZE) {
-    for (let y = startY; y < view.y1; y += BG_SIZE) {
-      ctx.drawImage(tile, x, y, BG_SIZE, BG_SIZE);
-    }
-  }
+  const w = camera.width;
+  const h = camera.height;
+  const overscan = Math.max(w, h) * 0.2;
+  const ox = Math.sin(time * 0.05 + camera.x * 0.0007) * overscan * 0.5;
+  const oy = Math.cos(time * 0.04 + camera.y * 0.0007) * overscan * 0.5;
+
+  ctx.drawImage(
+    ambientTexture(),
+    ox - overscan,
+    oy - overscan,
+    w + overscan * 2,
+    h + overscan * 2,
+  );
 }
 
 function drawGoal(ctx: CanvasRenderingContext2D, goal: Goal, time: number): void {
