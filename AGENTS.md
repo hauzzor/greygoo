@@ -120,6 +120,19 @@ src/ui/hud.ts         DOM wiring for tools/actions/sliders/camera dropdown/stats
    `C:\Users\phili\.local\share\opencode\opencode.db`; use the session picker /
    `--continue` in opencode. The DB also records the earlier planning session.
 
+## Commits
+
+Every change must end up in git. A project plugin (`.opencode/plugin/auto-commit.js`)
+registers a **`commit_changes`** tool:
+
+- At the end of **every logical task**, call `commit_changes` with a concise,
+  specific message (what changed and why). This commits all pending changes in
+  the repo (local only — **never push** unless the user asks).
+- A safety-net fallback commits any leftover changes when opencode exits.
+
+Auto-commit is local-only and respects `.gitignore`. Disable it for a run with
+`OPENCODE_AUTOCOMMIT=off`. A `/commit <message>` command is also available.
+
 ## Deploy (GitHub Pages)
 
 Remote: `https://github.com/hauzzor/greygoo.git`, branch `main`. Pushing to
