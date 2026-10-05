@@ -2,9 +2,10 @@
 
 Project folder: `C:\Users\phili\Desktop\vs code workspace\greygoo`
 
-World of Goo–inspired browser game: build a biological cell out of blocks in an
-editor, then launch it into a zero-g environment where it navigates to a goal
-autonomously.
+World of Goo–inspired browser game: build a biological cell out of blocks
+directly in a single, always-running zero-g environment. A Run/Pause button
+activates the blocks' abilities (thrusters, sensors) so the cell navigates
+toward a goal.
 
 ## Stack
 
@@ -19,7 +20,9 @@ gradient background with dappled light; soft, glowing organic shapes.
 
 - Goo ball = green droplet with gloss and velocity-based squash/stretch.
 - Thruster = warm firefly/seed that leaves a soft glowing plume.
-- Sensor = blossom; draws a faint warm "scent trail" to the goal in sim.
+- Sensor = blossom; draws a faint warm "scent trail" to the goal while running.
+- Camera = pale-blue lens; a highlighted ring marks the camera block the locked
+  camera is following.
 - Beams = translucent moss strands with a highlight core and a slight organic
   bow (visual only — physics stays straight).
 - Goal = pulsing sunbeam patch with expanding ripple rings and a blossom centre
@@ -51,7 +54,9 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 ## Game design (locked decisions)
 
 - 2D, top-down, zero-g petri dish with fluid drag (no gravity).
-- Blocks: **Goo ball**, **Thruster**, **Sensor**.
+- Blocks: **Goo ball**, **Thruster**, **Sensor**, **Camera**.
+- **Single environment — no editor/sim split.** Blocks are placed directly into
+  the running world; physics (fluid damping) runs at all times.
 - Beams auto-form between blocks within the connect radius (slider, default
   `90`, max `320`); soft/wobbly and **non-breaking**.
 - **Thruster thrust vector is derived live from its connected neighbours**: it
@@ -61,41 +66,49 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   thrusters in its connected component. Each thruster fires along its own
   neighbour-derived direction, weighted by `max(0, dot(dir, goalDir))`
   (orientation-weighted) times thrust power.
-- Stage 1 = **Editor**; Stage 2 = **Simulation**. Stage 2 is fully autonomous.
-- **Win** when any block touches the goal radius. Goal is a fixed marker at
-  world `(760, 0)`, radius `72`.
+- **Run/Pause** button (Space) toggles all abilities (thrusters + sensors)
+  globally. Pausing zeroes every block's `firing`.
+- **Camera block**: placing one adds it to a dropdown. A dedicated **Camera**
+  button (C) locks the view to the selected camera block; unlocked, the view is
+  panned by mouse drag.
+- **Undo** (button / Ctrl+Z) is snapshot-based and unbounded; it covers every
+  edit: placement, drag-move, delete, and clear.
+- **Win condition is not implemented yet** (removed pending design). The goal is
+  still drawn as a fixed marker at world `(760, 0)`, radius `72`.
 - No build limits (unlimited blocks).
-- New game starts with **one sensor** pre-placed at the origin.
-- **Reset** restores every block to the position it had in the editor at the
-  moment Launch was pressed (snapshot taken on launch), and recenters camera.
+- New game starts with **one sensor** pre-placed at the origin (not undoable).
 
 ## Controls
 
-- Palette / keys `1` Goo, `2` Thruster, `3` Sensor, `4` Pan.
-- Left-click on empty space starts **ghost placement**: a translucent preview
-  with the connections it would form; release to commit, `Escape` to cancel.
+- Blocks / keys `1` Goo, `2` Thruster, `3` Sensor, `4` Camera.
+- Tools / keys `5` Pan, `6` Select (no-spawn), `7` Delete.
+- Left-click on empty space (with a block tool) starts **ghost placement**: a
+  translucent preview with the connections it would form; release to commit,
+  `Escape` to cancel. **Select** places nothing; **Delete** removes the clicked
+  block (single click per block). `Delete` / `Backspace` removes the selected
+  block.
 - Drag an existing block to move it (re-runs auto-connect on release).
 - Right / middle mouse drag, or Pan tool + left drag, to pan. Wheel to zoom.
-- `Delete` / `Backspace` removes the selected block; `Space` launches / resets.
+- `Space` toggles Run/Pause; `C` toggles camera lock; `Ctrl+Z` undoes.
 
 ## File map
 
 ```
-index.html            HUD markup (palette, actions, sliders, stats, banner)
-src/main.ts           bootstrap, game loop (fixed 1/60), stage machine, input
-src/style.css         dark HUD styling
+index.html            HUD markup (blocks, tools, actions, advanced sliders, stats)
+src/main.ts           bootstrap, fixed 1/60 loop, tools, undo history, camera lock, input
+src/style.css         frosted light-green HUD styling
 src/core/vec2.ts      vector helpers
-src/core/types.ts     BlockType, Node, Beam, Ghost, Goal, Stage, Tool
-src/core/physics.ts   World: Verlet integration, beam constraints, separation
+src/core/types.ts     BlockType, Node, Beam, Ghost, Goal, Tool, WorldSnapshot
+src/core/physics.ts   World: Verlet integration, constraints, separation, snapshot/restore
 src/core/cell.ts      connectivity BFS, autoConnect, previewConnections, thrustDirection
 src/game/level.ts     goal definition
 src/game/editor.ts    BLOCK_RADIUS, placeBlock
-src/game/simulation.ts applyGuidance (sensor->thrusters), checkWin
-src/game/effects.ts   ambient life, thruster exhaust, placement/launch/win FX
-src/render/camera.ts  pan/zoom, world<->screen, follow, win "kick" punch
+src/game/simulation.ts applyGuidance (sensor->thrusters); checkWin kept for future win logic
+src/game/effects.ts   ambient life, thruster exhaust, placement/run/win FX
+src/render/camera.ts  pan/zoom, world<->screen, follow, "kick" punch
 src/render/particles.ts pooled particle system (world-space, additive glow)
-src/render/renderer.ts forest background, goal, beams, organic blocks, ghost
-src/ui/hud.ts         DOM wiring for palette/sliders/stats, hint text
+src/render/renderer.ts forest background, goal, beams, organic blocks, camera, ghost
+src/ui/hud.ts         DOM wiring for tools/actions/sliders/camera dropdown/stats
 ```
 
 ## How to continue in a new session
@@ -118,7 +131,9 @@ was enabled).
 
 ## Possible next steps
 
-- Goal placement in the editor (drag the goal marker) instead of fixed `(760,0)`.
+- Define and implement the **win condition** (currently disabled; `checkWin`
+  exists in `simulation.ts` but is not called).
+- Goal placement (drag the goal marker) instead of fixed `(760,0)`.
 - Multiple levels / moving or finishing targets; obstacles and collision terrain.
 - Breakable beams under stress (World of Goo style) — currently soft but permanent.
 - Thruster power / fuel budget and per-level build limits.

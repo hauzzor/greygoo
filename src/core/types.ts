@@ -1,6 +1,6 @@
 import type { Vec2 } from "./vec2";
 
-export type BlockType = "goo" | "thruster" | "sensor";
+export type BlockType = "goo" | "thruster" | "sensor" | "camera";
 
 export interface Node {
   id: number;
@@ -30,5 +30,24 @@ export interface Goal {
   radius: number;
 }
 
-export type Stage = "editor" | "sim";
-export type Tool = BlockType | "pan";
+export interface NodeSnapshot {
+  id: number;
+  type: BlockType;
+  x: number;
+  y: number;
+  radius: number;
+}
+
+export interface BeamSnapshot {
+  a: number;
+  b: number;
+  rest: number;
+}
+
+export interface WorldSnapshot {
+  nodes: NodeSnapshot[];
+  beams: BeamSnapshot[];
+  nextId: number;
+}
+
+export type Tool = BlockType | "pan" | "select" | "delete";

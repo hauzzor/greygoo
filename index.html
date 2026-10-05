@@ -16,35 +16,48 @@
         <button class="seg tool" data-tool="goo" title="Goo ball (1)">Goo</button>
         <button class="seg tool" data-tool="thruster" title="Thruster (2)">Thruster</button>
         <button class="seg tool" data-tool="sensor" title="Sensor (3)">Sensor</button>
-        <button class="seg tool" data-tool="pan" title="Pan (4)">Pan</button>
+        <button class="seg tool" data-tool="camera" title="Camera (4)">Camera</button>
+      </div>
+
+      <div class="group" id="tools">
+        <span class="group-label">Tool</span>
+        <button class="seg tool" data-tool="pan" title="Pan (5)">Pan</button>
+        <button class="seg tool" data-tool="select" title="Select — no block placed (6)">Select</button>
+        <button class="seg tool" data-tool="delete" title="Delete — click a block to remove it (7)">Delete</button>
       </div>
 
       <div class="group">
-        <button class="btn primary" id="launch" title="Launch (Space)">Launch</button>
-        <button class="btn" id="reset" title="Back to editor">Reset</button>
+        <button class="btn primary" id="run" title="Run / pause abilities (Space)">Run</button>
+        <button class="btn" id="camera-toggle" title="Lock camera to the selected camera block (C)">Camera</button>
+        <select class="select" id="camera-select" title="Camera block to follow"></select>
+        <button class="btn" id="undo" title="Undo (Ctrl+Z)">Undo</button>
         <button class="btn" id="clear">Clear</button>
       </div>
 
-      <div class="stage-pill" id="stage-pill">EDITOR</div>
+      <div class="stage-pill" id="stage-pill">BUILDING</div>
     </header>
 
     <aside class="hud hud-panel" id="panel">
       <label class="field">
-        <span class="field-label">Thrust <b id="power-val">600</b></span>
-        <input id="power" type="range" min="0" max="2000" step="50" value="600" />
-      </label>
-      <label class="field">
-        <span class="field-label">Fluid drag <b id="drag-val">1.5</b></span>
-        <input id="drag" type="range" min="0" max="4" step="0.1" value="1.5" />
-      </label>
-      <label class="field">
-        <span class="field-label">Stiffness <b id="stiff-val">0.5</b></span>
-        <input id="stiff" type="range" min="0.05" max="1" step="0.05" value="0.5" />
-      </label>
-      <label class="field">
-        <span class="field-label">Connect radius <b id="connect-val">55</b></span>
+        <span class="field-label">Connect radius <b id="connect-val">90</b></span>
         <input id="connect" type="range" min="25" max="320" step="5" value="90" />
       </label>
+
+      <details class="advanced">
+        <summary>Advanced</summary>
+        <label class="field">
+          <span class="field-label">Thrust <b id="power-val">600</b></span>
+          <input id="power" type="range" min="0" max="2000" step="50" value="600" />
+        </label>
+        <label class="field">
+          <span class="field-label">Fluid drag <b id="drag-val">1.5</b></span>
+          <input id="drag" type="range" min="0" max="4" step="0.1" value="1.5" />
+        </label>
+        <label class="field">
+          <span class="field-label">Stiffness <b id="stiff-val">0.5</b></span>
+          <input id="stiff" type="range" min="0.05" max="1" step="0.05" value="0.5" />
+        </label>
+      </details>
 
       <div class="stats">
         <div><span>Nodes</span><b id="stat-nodes">0</b></div>
@@ -54,7 +67,7 @@
     </aside>
 
     <footer class="hud hud-bottom">
-      <div id="hint">Click &amp; release to place · drag a block to move · right-drag to pan · wheel to zoom</div>
+      <div id="hint">Click &amp; release to place · drag a block to move · <b>6</b> Select · <b>7</b> Delete · right-drag to pan · wheel to zoom</div>
     </footer>
 
     <div id="banner" class="banner hidden"><span id="banner-text">GOAL REACHED</span></div>

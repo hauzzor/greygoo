@@ -1,18 +1,17 @@
 import "./style.css";
 import { World } from "./core/physics";
 import { autoConnect, previewConnections } from "./core/cell";
-import type { BlockType, Ghost, Stage, Tool } from "./core/types";
+import type { BlockType, Ghost, Tool, WorldSnapshot } from "./core/types";
 import { Camera } from "./render/camera";
 import { Particles } from "./render/particles";
 import { render } from "./render/renderer";
 import { createGoal } from "./game/level";
 import { BLOCK_RADIUS, placeBlock } from "./game/editor";
-import { applyGuidance, checkWin } from "./game/simulation";
+import { applyGuidance } from "./game/simulation";
 import {
-  emitLaunchPoof,
   emitPlacementPop,
+  emitRunPoof,
   emitThrusterExhaust,
-  emitWinBurst,
   updateAmbientLife,
 } from "./game/effects";
 import { createHud } from "./ui/hud";
@@ -27,85 +26,136 @@ const camera = new Camera();
 const particles = new Particles();
 const goal = createGoal();
 
-let stage: Stage = "editor";
 let tool: Tool = "goo";
 let selectedId: number | null = null;
-let won = false;
+let running = false;
 
 let panning = false;
 const panStart = { sx: 0, sy: 0, cx: 0, cy: 0 };
 let dragNodeId: number | null = null;
+let dragStart: WorldSnapshot | null = null;
+let dragMoved = false;
 let ghost: Ghost | null = null;
-let editorSnapshot = new Map<number, { x: number; y: number }>();
+
+const history: WorldSnapshot[] = [];
+
+let cameraLocked = false;
+let selectedCameraId: number | null = null;
 
 const hud = createHud({
   onTool: (t) => setTool(t),
-  onLaunch: () => launch(),
-  onReset: () => resetToEditor(),
-  onClear: () => {
-    world.clear();
-    particles.clear();
-    selectedId = null;
-    ghost = null;
-    editorSnapshot.clear();
-    won = false;
-    hud.banner(null);
+  onToggleRun: () => toggleRun(),
+  onToggleCamera: () => toggleCamera(),
+  onSelectCamera: (id) => {
+    selectedCameraId = id;
   },
+  onUndo: () => undo(),
+  onClear: () => clearAll(),
 });
 
 function setTool(t: Tool): void {
   tool = t;
+  if (ghost) ghost = null;
+  document.body.dataset.tool = t;
   hud.setToolActive(t);
 }
 
-function launch(): void {
-  if (stage === "sim" || world.nodes.size === 0) return;
-  ghost = null;
-  particles.clear();
-  const c = world.centroid();
-  emitLaunchPoof(particles, c.x, c.y);
-  editorSnapshot = new Map();
-  for (const node of world.nodes.values()) {
-    editorSnapshot.set(node.id, { x: node.pos.x, y: node.pos.y });
-  }
-  stage = "sim";
-  won = false;
-  hud.setStage("sim");
+function pushHistory(): void {
+  history.push(world.snapshot());
 }
 
-function resetToEditor(): void {
+function undo(): void {
+  const snap = history.pop();
+  if (!snap) return;
+  world.restore(snap);
+  selectedId = null;
   ghost = null;
-  particles.clear();
-  for (const node of world.nodes.values()) {
-    const saved = editorSnapshot.get(node.id);
-    if (saved) {
-      node.pos.x = saved.x;
-      node.pos.y = saved.y;
-      node.prev.x = saved.x;
-      node.prev.y = saved.y;
-    }
-    node.accel.x = 0;
-    node.accel.y = 0;
-    node.firing = 0;
-  }
-  const c = world.centroid();
-  camera.x = c.x;
-  camera.y = c.y;
-  stage = "editor";
-  won = false;
-  hud.setStage("editor");
   hud.banner(null);
+}
+
+function clearAll(): void {
+  pushHistory();
+  world.clear();
+  particles.clear();
+  selectedId = null;
+  ghost = null;
+  if (running) {
+    running = false;
+    hud.setRunning(false);
+  }
+  hud.banner(null);
+}
+
+function toggleRun(): void {
+  running = !running;
+  hud.setRunning(running);
+  if (running) {
+    const c = world.centroid();
+    emitRunPoof(particles, c.x, c.y);
+  } else {
+    for (const node of world.nodes.values()) node.firing = 0;
+  }
+  hud.banner(null);
+}
+
+function firstCameraId(): number | null {
+  for (const node of world.nodes.values()) {
+    if (node.type === "camera") return node.id;
+  }
+  return null;
+}
+
+function toggleCamera(): void {
+  if (selectedCameraId === null || !world.nodes.has(selectedCameraId)) {
+    const first = firstCameraId();
+    if (first === null) {
+      cameraLocked = false;
+      hud.setCameraLock(false);
+      return;
+    }
+    selectedCameraId = first;
+  }
+  cameraLocked = !cameraLocked;
+  hud.setCameraLock(cameraLocked);
+}
+
+function syncCameraOptions(): void {
+  const options: { id: number; label: string }[] = [];
+  for (const node of world.nodes.values()) {
+    if (node.type === "camera") {
+      options.push({ id: node.id, label: `Camera #${node.id}` });
+    }
+  }
+  if (
+    selectedCameraId !== null &&
+    !options.some((o) => o.id === selectedCameraId)
+  ) {
+    selectedCameraId = options.length > 0 ? options[0].id : null;
+  }
+  if (selectedCameraId === null && options.length > 0) {
+    selectedCameraId = options[0].id;
+  }
+  if (cameraLocked && selectedCameraId === null) {
+    cameraLocked = false;
+    hud.setCameraLock(false);
+  }
+  hud.setCameraOptions(options, selectedCameraId);
 }
 
 function startNewGame(): void {
   world.clear();
   particles.clear();
+  history.length = 0;
   selectedId = null;
   ghost = null;
-  editorSnapshot.clear();
-  won = false;
-  stage = "editor";
-  hud.setStage("editor");
+  dragNodeId = null;
+  dragStart = null;
+  dragMoved = false;
+  running = false;
+  cameraLocked = false;
+  selectedCameraId = null;
+  hud.setRunning(false);
+  hud.setCameraLock(false);
   hud.banner(null);
 
   const sensor = world.addNode("sensor", { x: 0, y: 0 }, BLOCK_RADIUS.sensor);
@@ -113,6 +163,7 @@ function startNewGame(): void {
   camera.x = 0;
   camera.y = 0;
   camera.scale = 1;
+  setTool("goo");
 }
 
 function pickNode(wx: number, wy: number): number | null {
@@ -138,11 +189,11 @@ function startPan(sx: number, sy: number): void {
 
 function selectAndDrag(id: number): void {
   selectedId = id;
-  if (stage === "editor") {
-    dragNodeId = id;
-    const n = world.nodes.get(id);
-    if (n) n.invMass = 0;
-  }
+  dragNodeId = id;
+  dragStart = world.snapshot();
+  dragMoved = false;
+  const n = world.nodes.get(id);
+  if (n) n.invMass = 0;
 }
 
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -165,12 +216,19 @@ canvas.addEventListener("pointerdown", (e) => {
 
   const w = camera.toWorld(sx, sy);
   const hit = pickNode(w.x, w.y);
+
   if (hit !== null) {
+    if (tool === "delete") {
+      pushHistory();
+      world.removeNode(hit);
+      if (selectedId === hit) selectedId = null;
+      return;
+    }
     selectAndDrag(hit);
     return;
   }
 
-  if (stage !== "editor") {
+  if (tool === "delete" || tool === "select") {
     selectedId = null;
     return;
   }
@@ -205,6 +263,7 @@ canvas.addEventListener("pointermove", (e) => {
     const n = world.nodes.get(dragNodeId);
     if (n) {
       const w = camera.toWorld(sx, sy);
+      if (Math.hypot(w.x - n.pos.x, w.y - n.pos.y) > 0.5) dragMoved = true;
       n.pos.x = w.x;
       n.pos.y = w.y;
       n.prev.x = w.x;
@@ -221,6 +280,7 @@ function endPointer(): void {
   if (ghost) {
     const g = ghost;
     ghost = null;
+    pushHistory();
     const node = placeBlock(world, g.type, g.pos);
     autoConnect(world, node.id, hud.params().connectRadius);
     emitPlacementPop(particles, node.pos.x, node.pos.y);
@@ -232,7 +292,10 @@ function endPointer(): void {
     const n = world.nodes.get(id);
     if (n) n.invMass = 1;
     autoConnect(world, id, hud.params().connectRadius);
+    if (dragMoved && dragStart) history.push(dragStart);
     dragNodeId = null;
+    dragStart = null;
+    dragMoved = false;
   }
 }
 
@@ -249,18 +312,27 @@ canvas.addEventListener(
 );
 
 window.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && (e.key === "z" || e.key === "Z")) {
+    e.preventDefault();
+    undo();
+    return;
+  }
   if (e.code === "Space") {
     e.preventDefault();
-    if (stage === "editor") launch();
-    else resetToEditor();
+    toggleRun();
     return;
   }
   if (e.key === "1") setTool("goo");
   else if (e.key === "2") setTool("thruster");
   else if (e.key === "3") setTool("sensor");
-  else if (e.key === "4") setTool("pan");
+  else if (e.key === "4") setTool("camera");
+  else if (e.key === "5") setTool("pan");
+  else if (e.key === "6") setTool("select");
+  else if (e.key === "7") setTool("delete");
+  else if (e.key === "c" || e.key === "C") toggleCamera();
   else if (e.key === "Delete" || e.key === "Backspace") {
     if (selectedId !== null) {
+      pushHistory();
       world.removeNode(selectedId);
       selectedId = null;
     }
@@ -290,29 +362,20 @@ let accumulator = 0;
 function update(dt: number): void {
   const p = hud.params();
   world.params.stiffness = p.stiffness;
+  world.params.damping = Math.exp(-p.drag * dt);
   camera.decayKick(dt);
 
-  if (stage === "editor") {
-    world.params.damping = 0.99;
-  } else {
-    world.params.damping = Math.exp(-p.drag * dt);
-    applyGuidance(world, goal, p.power);
-  }
+  if (running) applyGuidance(world, goal, p.power);
 
   world.step(dt);
 
+  if (running) emitThrusterExhaust(world, particles, dt);
+
   updateAmbientLife(particles, camera, dt);
 
-  if (stage === "sim") {
-    emitThrusterExhaust(world, particles, dt);
-
-    if (!won && checkWin(world, goal)) {
-      won = true;
-      hud.banner("GOAL REACHED");
-      emitWinBurst(particles, goal);
-      camera.punch(0.08);
-    }
-    if (!won) camera.follow(world.centroid(), 0.04);
+  if (cameraLocked && selectedCameraId !== null) {
+    const locked = world.nodes.get(selectedCameraId);
+    if (locked) camera.follow(locked.pos, 0.2);
   }
 
   particles.update(dt);
@@ -330,15 +393,18 @@ function draw(): void {
     world,
     goal,
     {
-      stage,
+      running,
       selectedId,
       connectRadius: hud.params().connectRadius,
       time: performance.now() / 1000,
-      won,
+      cameraLocked,
+      selectedCameraId,
       ghost,
     },
     particles,
   );
+
+  syncCameraOptions();
 
   const c = world.centroid();
   const distance =

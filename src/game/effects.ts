@@ -108,7 +108,7 @@ export function emitPlacementPop(
   });
 }
 
-export function emitLaunchPoof(
+export function emitRunPoof(
   particles: Particles,
   x: number,
   y: number,

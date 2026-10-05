@@ -1,4 +1,4 @@
-import type { Stage, Tool } from "../core/types";
+import type { Tool } from "../core/types";
 
 export interface HudParams {
   power: number;
@@ -7,15 +7,24 @@ export interface HudParams {
   connectRadius: number;
 }
 
+export interface CameraOption {
+  id: number;
+  label: string;
+}
+
 export interface HudHandlers {
   onTool: (tool: Tool) => void;
-  onLaunch: () => void;
-  onReset: () => void;
+  onToggleRun: () => void;
+  onToggleCamera: () => void;
+  onSelectCamera: (id: number) => void;
+  onUndo: () => void;
   onClear: () => void;
 }
 
 export interface Hud {
-  setStage: (stage: Stage) => void;
+  setRunning: (running: boolean) => void;
+  setCameraLock: (locked: boolean) => void;
+  setCameraOptions: (options: CameraOption[], selectedId: number | null) => void;
   setStats: (nodes: number, beams: number, distance: number | null) => void;
   banner: (text: string | null) => void;
   setToolActive: (tool: Tool) => void;
@@ -34,7 +43,12 @@ export function createHud(handlers: HudHandlers): Hud {
   const stagePill = el<HTMLDivElement>("stage-pill");
   const bannerEl = el<HTMLDivElement>("banner");
   const bannerText = el<HTMLSpanElement>("banner-text");
-  const hint = el<HTMLDivElement>("hint");
+
+  const runBtn = el<HTMLButtonElement>("run");
+  const cameraBtn = el<HTMLButtonElement>("camera-toggle");
+  const cameraSelect = el<HTMLSelectElement>("camera-select");
+  const undoBtn = el<HTMLButtonElement>("undo");
+  const clearBtn = el<HTMLButtonElement>("clear");
 
   const power = el<HTMLInputElement>("power");
   const drag = el<HTMLInputElement>("drag");
@@ -50,6 +64,7 @@ export function createHud(handlers: HudHandlers): Hud {
   const statDist = el<HTMLElement>("stat-dist");
 
   let activeTool: Tool = "goo";
+  let optionsKey = "";
 
   const syncLabel = (): void => {
     powerVal.textContent = power.value;
@@ -71,18 +86,47 @@ export function createHud(handlers: HudHandlers): Hud {
     });
   }
 
-  el<HTMLButtonElement>("launch").addEventListener("click", handlers.onLaunch);
-  el<HTMLButtonElement>("reset").addEventListener("click", handlers.onReset);
-  el<HTMLButtonElement>("clear").addEventListener("click", handlers.onClear);
+  runBtn.addEventListener("click", handlers.onToggleRun);
+  cameraBtn.addEventListener("click", handlers.onToggleCamera);
+  undoBtn.addEventListener("click", handlers.onUndo);
+  clearBtn.addEventListener("click", handlers.onClear);
+  cameraSelect.addEventListener("change", () => {
+    if (cameraSelect.value === "") return;
+    handlers.onSelectCamera(Number(cameraSelect.value));
+  });
 
   const hud: Hud = {
-    setStage(stage: Stage) {
-      stagePill.textContent = stage === "editor" ? "EDITOR" : "SIMULATION";
-      stagePill.classList.toggle("sim", stage === "sim");
-      hint.innerHTML =
-        stage === "editor"
-          ? "Click &amp; release to place (preview shows connections) · drag a block to move · right-drag to pan · wheel to zoom"
-          : "Cell is navigating autonomously · <b>Space</b> / Reset to keep building";
+    setRunning(running: boolean) {
+      runBtn.textContent = running ? "Pause" : "Run";
+      runBtn.classList.toggle("on", running);
+      stagePill.textContent = running ? "RUNNING" : "BUILDING";
+      stagePill.classList.toggle("running", running);
+    },
+    setCameraLock(locked: boolean) {
+      cameraBtn.classList.toggle("on", locked);
+    },
+    setCameraOptions(options, selectedId) {
+      const key = options.map((o) => o.id).join(",");
+      if (key !== optionsKey) {
+        optionsKey = key;
+        cameraSelect.innerHTML = "";
+        if (options.length === 0) {
+          const empty = document.createElement("option");
+          empty.value = "";
+          empty.textContent = "No camera";
+          cameraSelect.appendChild(empty);
+        } else {
+          for (const option of options) {
+            const opt = document.createElement("option");
+            opt.value = String(option.id);
+            opt.textContent = option.label;
+            cameraSelect.appendChild(opt);
+          }
+        }
+      }
+      cameraSelect.value = selectedId === null ? "" : String(selectedId);
+      cameraSelect.disabled = options.length === 0;
+      cameraBtn.disabled = options.length === 0;
     },
     setStats(nodes, beams, distance) {
       statNodes.textContent = String(nodes);

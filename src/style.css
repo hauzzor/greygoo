@@ -134,9 +134,70 @@ body {
   background: rgba(255, 255, 255, 0.35);
 }
 
-.stage-pill.sim {
+.stage-pill.running {
   color: var(--gold);
   border-color: rgba(207, 154, 52, 0.5);
+}
+
+.btn.on {
+  background: rgba(207, 154, 52, 0.22);
+  border-color: rgba(207, 154, 52, 0.55);
+  color: var(--gold);
+}
+
+.select {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.4);
+  color: var(--text);
+  padding: 6px 9px;
+  border-radius: 9px;
+  font: inherit;
+  cursor: pointer;
+  max-width: 130px;
+}
+
+.select:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.advanced {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.advanced > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  list-style: none;
+}
+
+.advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced[open] > summary {
+  margin-bottom: 10px;
+}
+
+.advanced .field + .field {
+  margin-top: 10px;
+}
+
+body[data-tool="pan"] #stage {
+  cursor: grab;
+}
+
+body[data-tool="select"] #stage {
+  cursor: default;
+}
+
+body[data-tool="delete"] #stage {
+  cursor: pointer;
 }
 
 .hud-panel {

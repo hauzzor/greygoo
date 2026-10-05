@@ -5,6 +5,7 @@ export const BLOCK_RADIUS: Record<BlockType, number> = {
   goo: 13,
   thruster: 15,
   sensor: 14,
+  camera: 14,
 };
 
 export function placeBlock(

@@ -1,4 +1,11 @@
-import type { BlockType, Beam, Node } from "./types";
+import type {
+  BlockType,
+  Beam,
+  BeamSnapshot,
+  Node,
+  NodeSnapshot,
+  WorldSnapshot,
+} from "./types";
 import { v } from "./vec2";
 
 export interface PhysicsParams {
@@ -43,6 +50,43 @@ export class World {
     this.nodes.clear();
     this.beams = [];
     this.nextId = 1;
+  }
+
+  snapshot(): WorldSnapshot {
+    const nodes: NodeSnapshot[] = [];
+    for (const n of this.nodes.values()) {
+      nodes.push({
+        id: n.id,
+        type: n.type,
+        x: n.pos.x,
+        y: n.pos.y,
+        radius: n.radius,
+      });
+    }
+    const beams: BeamSnapshot[] = this.beams.map((b) => ({
+      a: b.a,
+      b: b.b,
+      rest: b.rest,
+    }));
+    return { nodes, beams, nextId: this.nextId };
+  }
+
+  restore(snap: WorldSnapshot): void {
+    this.nodes.clear();
+    for (const s of snap.nodes) {
+      this.nodes.set(s.id, {
+        id: s.id,
+        type: s.type,
+        pos: v(s.x, s.y),
+        prev: v(s.x, s.y),
+        accel: v(0, 0),
+        radius: s.radius,
+        invMass: 1,
+        firing: 0,
+      });
+    }
+    this.beams = snap.beams.map((b) => ({ a: b.a, b: b.b, rest: b.rest }));
+    this.nextId = snap.nextId;
   }
 
   connected(a: number, b: number): boolean {

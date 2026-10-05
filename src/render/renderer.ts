@@ -1,17 +1,18 @@
 import type { Camera } from "./camera";
 import type { World } from "../core/physics";
-import type { Ghost, Goal, Node, Stage } from "../core/types";
+import type { Ghost, Goal, Node } from "../core/types";
 import type { Vec2 } from "../core/vec2";
 import { thrustDirection } from "../core/cell";
 import { BLOCK_RADIUS } from "../game/editor";
 import type { Particles } from "./particles";
 
 export interface RenderState {
-  stage: Stage;
+  running: boolean;
   selectedId: number | null;
   connectRadius: number;
   time: number;
-  won: boolean;
+  cameraLocked: boolean;
+  selectedCameraId: number | null;
   ghost: Ghost | null;
 }
 
@@ -25,6 +26,9 @@ const PETAL_CORE = "#fff7c2";
 const SUNBEAM = "#ffe9a8";
 const SUNBEAM_RING = "#f7d774";
 const HALO = "#a9e6b0";
+const CAMERA_LIGHT = "#cdeee4";
+const CAMERA_MID = "#6fc2b0";
+const CAMERA_DARK = "#2f6f68";
 
 function hexA(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
@@ -60,6 +64,8 @@ export function render(
   for (const node of world.nodes.values()) {
     const dir =
       node.type === "thruster" ? thrustDirection(world, node.id) : null;
+    const cameraActive =
+      state.cameraLocked && node.id === state.selectedCameraId;
     drawBlock(
       ctx,
       node.type,
@@ -68,10 +74,11 @@ export function render(
       node.radius,
       dir,
       node.firing,
-      state.stage,
+      state.running,
       goal,
       state.time,
       node,
+      cameraActive,
     );
   }
 
@@ -247,10 +254,11 @@ function drawBlock(
   radius: number,
   dir: Vec2 | null,
   firing: number,
-  stage: Stage,
+  running: boolean,
   goal: Goal,
   time: number,
   node: Node | null,
+  cameraActive = false,
 ): void {
   if (type === "goo") {
     drawGoo(ctx, x, y, radius, node);
@@ -260,7 +268,11 @@ function drawBlock(
     drawThruster(ctx, x, y, radius, dir, firing);
     return;
   }
-  drawSensor(ctx, x, y, radius, stage, goal, time);
+  if (type === "camera") {
+    drawCamera(ctx, x, y, radius, cameraActive);
+    return;
+  }
+  drawSensor(ctx, x, y, radius, running, goal, time);
 }
 
 function drawGoo(
@@ -406,11 +418,11 @@ function drawSensor(
   x: number,
   y: number,
   radius: number,
-  stage: Stage,
+  running: boolean,
   goal: Goal,
   time: number,
 ): void {
-  if (stage === "sim") {
+  if (running) {
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(goal.pos.x, goal.pos.y);
@@ -422,6 +434,56 @@ function drawSensor(
   }
 
   drawBlossom(ctx, x, y, radius, time, PETAL, PETAL_CORE);
+}
+
+function drawCamera(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  active: boolean,
+): void {
+  if (active) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = hexA(CAMERA_LIGHT, 0.8);
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  }
+
+  const grad = ctx.createRadialGradient(
+    x - radius * 0.3,
+    y - radius * 0.3,
+    radius * 0.15,
+    x,
+    y,
+    radius,
+  );
+  grad.addColorStop(0, CAMERA_LIGHT);
+  grad.addColorStop(1, CAMERA_MID);
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = "rgba(30, 70, 66, 0.5)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.62, 0, Math.PI * 2);
+  ctx.strokeStyle = CAMERA_DARK;
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.38, 0, Math.PI * 2);
+  ctx.fillStyle = CAMERA_DARK;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(x - radius * 0.16, y - radius * 0.16, radius * 0.14, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+  ctx.fill();
 }
 
 function ghostDirection(world: World, ghost: Ghost): Vec2 | null {
@@ -490,7 +552,7 @@ function drawGhost(
     radius,
     dir,
     0,
-    "editor",
+    false,
     { pos: ghost.pos, radius: 0 },
     time,
     null,
