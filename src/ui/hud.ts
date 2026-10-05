@@ -25,7 +25,12 @@ export interface Hud {
   setRunning: (running: boolean) => void;
   setCameraLock: (locked: boolean) => void;
   setCameraOptions: (options: CameraOption[], selectedId: number | null) => void;
-  setStats: (nodes: number, beams: number, distance: number | null) => void;
+  setStats: (
+    nodes: number,
+    beams: number,
+    distance: number | null,
+    fps: number,
+  ) => void;
   banner: (text: string | null) => void;
   setToolActive: (tool: Tool) => void;
   getTool: () => Tool;
@@ -62,8 +67,9 @@ export function createHud(handlers: HudHandlers): Hud {
   const statNodes = el<HTMLElement>("stat-nodes");
   const statBeams = el<HTMLElement>("stat-beams");
   const statDist = el<HTMLElement>("stat-dist");
+  const statFps = el<HTMLElement>("stat-fps");
 
-  let activeTool: Tool = "goo";
+  let activeTool: Tool = "cell";
   let optionsKey = "";
 
   const syncLabel = (): void => {
@@ -128,10 +134,11 @@ export function createHud(handlers: HudHandlers): Hud {
       cameraSelect.disabled = options.length === 0;
       cameraBtn.disabled = options.length === 0;
     },
-    setStats(nodes, beams, distance) {
+    setStats(nodes, beams, distance, fps) {
       statNodes.textContent = String(nodes);
       statBeams.textContent = String(beams);
       statDist.textContent = distance === null ? "–" : `${Math.round(distance)} px`;
+      statFps.textContent = String(Math.round(fps));
     },
     banner(text) {
       if (text === null) {
@@ -156,6 +163,6 @@ export function createHud(handlers: HudHandlers): Hud {
     }),
   };
 
-  hud.setToolActive("goo");
+  hud.setToolActive("cell");
   return hud;
 }

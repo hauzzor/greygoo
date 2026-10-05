@@ -1,6 +1,6 @@
 import type { World } from "../core/physics";
 import type { Goal } from "../core/types";
-import { connectedComponent, thrustDirection } from "../core/cell";
+import { connectedComponent } from "../core/cell";
 
 export function applyGuidance(world: World, goal: Goal, power: number): void {
   for (const node of world.nodes.values()) node.firing = 0;
@@ -19,14 +19,15 @@ export function applyGuidance(world: World, goal: Goal, power: number): void {
       const thruster = world.nodes.get(id);
       if (!thruster || thruster.type !== "thruster") continue;
 
-      const dir = thrustDirection(world, thruster.id);
-      if (!dir) continue;
+      const dirX = thruster.dirX;
+      const dirY = thruster.dirY;
+      if (dirX === 0 && dirY === 0) continue;
 
-      const weight = Math.max(0, dir.x * gx + dir.y * gy);
+      const weight = Math.max(0, dirX * gx + dirY * gy);
       if (weight <= 0) continue;
 
-      thruster.accel.x += dir.x * weight * power;
-      thruster.accel.y += dir.y * weight * power;
+      thruster.accel.x += dirX * weight * power;
+      thruster.accel.y += dirY * weight * power;
       thruster.firing = Math.max(thruster.firing, weight);
     }
   }

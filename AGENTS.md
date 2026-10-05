@@ -10,7 +10,8 @@ toward a goal.
 ## Stack
 
 - Vite + vanilla TypeScript (no framework), Canvas 2D rendering.
-- Custom Verlet physics with soft distance constraints (no external physics lib).
+- Custom Verlet physics with stiff distance constraints ("rigid springs", still
+  a little wobbly), no external physics lib.
 - No runtime dependencies.
 
 ## Look & feel
@@ -18,20 +19,23 @@ toward a goal.
 Friendly, organic forest-puddle aesthetic (not scientific). Light forest-green
 gradient background with dappled light; soft, glowing organic shapes.
 
-- Goo ball = green droplet with gloss and velocity-based squash/stretch.
+- **Basic Cell** = irregular jelly blob (animated wobbly outline) with gloss and
+  velocity-based squash/stretch.
 - Thruster = warm firefly/seed that leaves a soft glowing plume.
 - Sensor = blossom; draws a faint warm "scent trail" to the goal while running.
 - Camera = pale-blue lens; a highlighted ring marks the camera block the locked
   camera is following.
-- Beams = translucent moss strands with a highlight core and a slight organic
-  bow (visual only — physics stays straight).
+- **Beams = goo/glue ribbons**: tapered, bulging where they meet cells, pinched
+  in the middle, translucent with a wet highlight and a strain-driven wobble.
 - Goal = pulsing sunbeam patch with expanding ripple rings and a blossom centre
   (no crosshair).
-- Calm ambient life: drifting pollen motes and occasional rising bubbles.
+- Ambient life: drifting pollen motes and occasional rising bubbles.
 - UI is frosted light-green glass (HUD stays visible), leaf-green accents.
 
 All effects are procedural (Canvas 2D + a small particle pool); no image,
-audio, or font assets.
+audio, or font assets. Performance matters (target 300+ blocks): soft glows and
+the background come from **cached offscreen sprites/tiles**, all `shadowBlur`
+is avoided, and blocks/beams/particles are **viewport-culled**.
 
 ## Commands
 
@@ -54,14 +58,16 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 ## Game design (locked decisions)
 
 - 2D, top-down, zero-g petri dish with fluid drag (no gravity).
-- Blocks: **Goo ball**, **Thruster**, **Sensor**, **Camera**.
+- Blocks: **Basic Cell** (`cell`), **Thruster**, **Sensor**, **Camera**.
 - **Single environment — no editor/sim split.** Blocks are placed directly into
   the running world; physics (fluid damping) runs at all times.
 - Beams auto-form between blocks within the connect radius (slider, default
-  `90`, max `320`); soft/wobbly and **non-breaking**.
+  `90`, max `320`); **stiff springs** (Advanced "Beam rigidity", default `0.9`),
+  a little wobbly but **non-breaking**.
 - **Thruster thrust vector is derived live from its connected neighbours**: it
-  points toward the (normalized, averaged) connected-neighbour positions and is
-  recomputed every frame. A thruster with no neighbours produces no thrust.
+  points toward the (normalized, averaged) connected-neighbour positions. It is
+  computed **once per frame** into `node.dirX/dirY` (used by both physics and
+  rendering). A thruster with no neighbours produces no thrust.
 - **Sensor** computes the unit vector to the goal and broadcasts it to all
   thrusters in its connected component. Each thruster fires along its own
   neighbour-derived direction, weighted by `max(0, dot(dir, goalDir))`
@@ -80,7 +86,7 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 
 ## Controls
 
-- Blocks / keys `1` Goo, `2` Thruster, `3` Sensor, `4` Camera.
+- Blocks / keys `1` Basic Cell, `2` Thruster, `3` Sensor, `4` Camera.
 - Tools / keys `5` Pan, `6` Select (no-spawn), `7` Delete.
 - Left-click on empty space (with a block tool) starts **ghost placement**: a
   translucent preview with the connections it would form; release to commit,
@@ -99,15 +105,16 @@ src/main.ts           bootstrap, fixed 1/60 loop, tools, undo history, camera lo
 src/style.css         frosted light-green HUD styling
 src/core/vec2.ts      vector helpers
 src/core/types.ts     BlockType, Node, Beam, Ghost, Goal, Tool, WorldSnapshot
-src/core/physics.ts   World: Verlet integration, constraints, separation, snapshot/restore
-src/core/cell.ts      connectivity BFS, autoConnect, previewConnections, thrustDirection
+src/core/physics.ts   World: Verlet+stiff constraints, adjacency index, spatial-hash separation, snapshot/restore
+src/core/cell.ts      adjacency BFS/autoConnect/preview, thrustDirection + updateThrustDirections
 src/game/level.ts     goal definition
 src/game/editor.ts    BLOCK_RADIUS, placeBlock
 src/game/simulation.ts applyGuidance (sensor->thrusters); checkWin kept for future win logic
 src/game/effects.ts   ambient life, thruster exhaust, placement/run/win FX
 src/render/camera.ts  pan/zoom, world<->screen, follow, "kick" punch
-src/render/particles.ts pooled particle system (world-space, additive glow)
-src/render/renderer.ts forest background, goal, beams, organic blocks, camera, ghost
+src/render/sprites.ts offscreen sprite/tile cache (glow, background, particle dots)
+src/render/particles.ts pooled particle system (world-space, sprite dots, additive glow)
+src/render/renderer.ts cached background, goal, goo-ribbon beams, organic blobs, camera, ghost
 src/ui/hud.ts         DOM wiring for tools/actions/sliders/camera dropdown/stats
 ```
 

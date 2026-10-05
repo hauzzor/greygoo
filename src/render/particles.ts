@@ -1,3 +1,5 @@
+import { sprites } from "./sprites";
+
 export interface Particle {
   x: number;
   y: number;
@@ -27,7 +29,27 @@ export interface EmitOptions {
   alpha?: number;
 }
 
+export interface View {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 const MOTE_WHITE: [number, number, number] = [234, 251, 224];
+const DOT_SIZE = 16;
+
+function dotSprite(r: number, g: number, b: number): HTMLCanvasElement {
+  return sprites.get(`dot|${r}|${g}|${b}`, DOT_SIZE, DOT_SIZE, (ctx) => {
+    const half = DOT_SIZE / 2;
+    const grad = ctx.createRadialGradient(half, half, 0, half, half, half);
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
+    grad.addColorStop(0.55, `rgba(${r}, ${g}, ${b}, 0.5)`);
+    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, DOT_SIZE, DOT_SIZE);
+  });
+}
 
 export class Particles {
   private items: Particle[] = [];
@@ -90,9 +112,16 @@ export class Particles {
     items.length = write;
   }
 
-  draw(ctx: CanvasRenderingContext2D): void {
+  draw(ctx: CanvasRenderingContext2D, view?: View): void {
     let glowed = false;
     for (const p of this.items) {
+      if (
+        view &&
+        (p.x < view.x0 || p.x > view.x1 || p.y < view.y0 || p.y > view.y1)
+      ) {
+        continue;
+      }
+
       const t = p.life / p.maxLife;
       const fade = t > 0.85 ? (1 - t) / 0.15 : t / 0.85;
       const a = p.alpha * Math.max(0, Math.min(1, fade));
@@ -103,11 +132,11 @@ export class Particles {
         glowed = p.glow;
       }
 
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * (0.5 + t * 0.5), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${a})`;
-      ctx.fill();
+      const size = p.size * (1.5 + t * 1.5);
+      ctx.globalAlpha = a;
+      ctx.drawImage(dotSprite(p.r, p.g, p.b), p.x - size, p.y - size, size * 2, size * 2);
     }
+    ctx.globalAlpha = 1;
     if (glowed) ctx.globalCompositeOperation = "source-over";
   }
 

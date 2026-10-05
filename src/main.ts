@@ -1,6 +1,10 @@
 import "./style.css";
 import { World } from "./core/physics";
-import { autoConnect, previewConnections } from "./core/cell";
+import {
+  autoConnect,
+  previewConnections,
+  updateThrustDirections,
+} from "./core/cell";
 import type { BlockType, Ghost, Tool, WorldSnapshot } from "./core/types";
 import { Camera } from "./render/camera";
 import { Particles } from "./render/particles";
@@ -26,7 +30,7 @@ const camera = new Camera();
 const particles = new Particles();
 const goal = createGoal();
 
-let tool: Tool = "goo";
+let tool: Tool = "cell";
 let selectedId: number | null = null;
 let running = false;
 
@@ -163,7 +167,7 @@ function startNewGame(): void {
   camera.x = 0;
   camera.y = 0;
   camera.scale = 1;
-  setTool("goo");
+  setTool("cell");
 }
 
 function pickNode(wx: number, wy: number): number | null {
@@ -322,7 +326,7 @@ window.addEventListener("keydown", (e) => {
     toggleRun();
     return;
   }
-  if (e.key === "1") setTool("goo");
+  if (e.key === "1") setTool("cell");
   else if (e.key === "2") setTool("thruster");
   else if (e.key === "3") setTool("sensor");
   else if (e.key === "4") setTool("camera");
@@ -358,12 +362,15 @@ resize();
 const DT = 1 / 60;
 let last = performance.now();
 let accumulator = 0;
+let fpsSmooth = 60;
 
 function update(dt: number): void {
   const p = hud.params();
   world.params.stiffness = p.stiffness;
   world.params.damping = Math.exp(-p.drag * dt);
   camera.decayKick(dt);
+
+  updateThrustDirections(world);
 
   if (running) applyGuidance(world, goal, p.power);
 
@@ -409,11 +416,13 @@ function draw(): void {
   const c = world.centroid();
   const distance =
     world.nodes.size > 0 ? Math.hypot(goal.pos.x - c.x, goal.pos.y - c.y) : null;
-  hud.setStats(world.nodes.size, world.beams.length, distance);
+  hud.setStats(world.nodes.size, world.beams.length, distance, fpsSmooth);
 }
 
 function frame(now: number): void {
-  const elapsed = Math.min(0.05, (now - last) / 1000);
+  const raw = (now - last) / 1000;
+  const elapsed = Math.min(0.05, raw);
+  if (raw > 0) fpsSmooth += (1 / raw - fpsSmooth) * 0.1;
   last = now;
   accumulator += elapsed;
 

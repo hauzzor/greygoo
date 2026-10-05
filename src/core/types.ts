@@ -1,6 +1,6 @@
 import type { Vec2 } from "./vec2";
 
-export type BlockType = "goo" | "thruster" | "sensor" | "camera";
+export type BlockType = "cell" | "thruster" | "sensor" | "camera";
 
 export interface Node {
   id: number;
@@ -11,6 +11,8 @@ export interface Node {
   radius: number;
   invMass: number;
   firing: number;
+  dirX: number;
+  dirY: number;
 }
 
 export interface Ghost {

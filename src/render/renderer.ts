@@ -2,9 +2,9 @@ import type { Camera } from "./camera";
 import type { World } from "../core/physics";
 import type { Ghost, Goal, Node } from "../core/types";
 import type { Vec2 } from "../core/vec2";
-import { thrustDirection } from "../core/cell";
 import { BLOCK_RADIUS } from "../game/editor";
-import type { Particles } from "./particles";
+import { sprites } from "./sprites";
+import type { Particles, View } from "./particles";
 
 export interface RenderState {
   running: boolean;
@@ -30,14 +30,88 @@ const CAMERA_LIGHT = "#cdeee4";
 const CAMERA_MID = "#6fc2b0";
 const CAMERA_DARK = "#2f6f68";
 
+const CELL_SEG = 12;
+const BEAM_SEG = 6;
+const BG_SIZE = 1024;
+const beamPts = new Float32Array((BEAM_SEG + 1) * 2);
+
 function hexA(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-function hash2(x: number, y: number): number {
-  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return n - Math.floor(n);
+function glowSprite(color: string, radius: number): HTMLCanvasElement {
+  const r = Math.max(4, Math.round(radius / 4) * 4);
+  return sprites.get(`glow|${color}|${r}`, r * 2, r * 2, (ctx) => {
+    const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, r * 2, r * 2);
+  });
+}
+
+function drawGlow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  color: string,
+): void {
+  const r = Math.max(4, Math.round(radius / 4) * 4);
+  ctx.drawImage(glowSprite(color, radius), x - r, y - r, r * 2, r * 2);
+}
+
+function backgroundTile(): HTMLCanvasElement {
+  return sprites.get("bg", BG_SIZE, BG_SIZE, (ctx) => {
+    let s = 987654321;
+    const rand = (): number => {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      return s / 0x7fffffff;
+    };
+    for (let i = 0; i < 14; i++) {
+      const cx = rand() * BG_SIZE;
+      const cy = rand() * BG_SIZE;
+      const r = 120 + rand() * 220;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, "rgba(234, 251, 224, 0.05)");
+      grad.addColorStop(1, "rgba(234, 251, 224, 0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+    ctx.strokeStyle = "rgba(220, 245, 205, 0.045)";
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 10; i++) {
+      const cx = rand() * BG_SIZE;
+      const cy = rand() * BG_SIZE;
+      const r = 40 + rand() * 120;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  });
+}
+
+function nodeVisible(x: number, y: number, r: number, view: View): boolean {
+  return x + r >= view.x0 && x - r <= view.x1 && y + r >= view.y0 && y - r <= view.y1;
+}
+
+function segmentVisible(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  view: View,
+  margin: number,
+): boolean {
+  const x0 = Math.min(ax, bx) - margin;
+  const x1 = Math.max(ax, bx) + margin;
+  const y0 = Math.min(ay, by) - margin;
+  const y1 = Math.max(ay, by) + margin;
+  return x1 >= view.x0 && x0 <= view.x1 && y1 >= view.y0 && y0 <= view.y1;
 }
 
 export function render(
@@ -56,14 +130,26 @@ export function render(
   ctx.scale(scale, scale);
   ctx.translate(-camera.x, -camera.y);
 
-  drawBackground(ctx, camera, state.time);
+  const halfW = width / 2 / camera.scale;
+  const halfH = height / 2 / camera.scale;
+  const view: View = {
+    x0: camera.x - halfW,
+    y0: camera.y - halfH,
+    x1: camera.x + halfW,
+    y1: camera.y + halfH,
+  };
+
+  drawBackground(ctx, state.time, view);
   drawGoal(ctx, goal, state.time);
-  particles.draw(ctx);
-  drawBeams(ctx, world, state.time);
+  particles.draw(ctx, view);
+  drawBeams(ctx, world, state.time, view);
 
   for (const node of world.nodes.values()) {
+    if (!nodeVisible(node.pos.x, node.pos.y, node.radius + 26, view)) continue;
     const dir =
-      node.type === "thruster" ? thrustDirection(world, node.id) : null;
+      node.type === "thruster" && (node.dirX !== 0 || node.dirY !== 0)
+        ? { x: node.dirX, y: node.dirY }
+        : null;
     const cameraActive =
       state.cameraLocked && node.id === state.selectedCameraId;
     drawBlock(
@@ -110,32 +196,16 @@ export function render(
 
 function drawBackground(
   ctx: CanvasRenderingContext2D,
-  camera: Camera,
   time: number,
+  view: View,
 ): void {
-  const halfW = camera.width / 2 / camera.scale;
-  const halfH = camera.height / 2 / camera.scale;
-  const x0 = camera.x - halfW;
-  const x1 = camera.x + halfW;
-  const y0 = camera.y - halfH;
-  const y1 = camera.y + halfH;
-
-  const cell = 560;
-  for (let gx = Math.floor(x0 / cell); gx <= Math.floor(x1 / cell); gx++) {
-    for (let gy = Math.floor(y0 / cell); gy <= Math.floor(y1 / cell); gy++) {
-      const h = hash2(gx, gy);
-      const h2 = hash2(gx + 17, gy - 9);
-      const cx = (gx + 0.2 + h * 0.6) * cell;
-      const cy = (gy + 0.2 + h2 * 0.6) * cell;
-      const r = 200 + h * 190;
-      const pulse = 0.5 + 0.5 * Math.sin(time * 0.25 + h * 6.283);
-      const alpha = 0.03 + 0.035 * pulse;
-
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      grad.addColorStop(0, hexA(LEAF_LIGHT, alpha));
-      grad.addColorStop(1, hexA(LEAF_LIGHT, 0));
-      ctx.fillStyle = grad;
-      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  const tile = backgroundTile();
+  const drift = (time * 8) % BG_SIZE;
+  const startX = Math.floor((view.x0 - drift) / BG_SIZE) * BG_SIZE + drift;
+  const startY = Math.floor((view.y0 - drift) / BG_SIZE) * BG_SIZE + drift;
+  for (let x = startX; x < view.x1; x += BG_SIZE) {
+    for (let y = startY; y < view.y1; y += BG_SIZE) {
+      ctx.drawImage(tile, x, y, BG_SIZE, BG_SIZE);
     }
   }
 }
@@ -208,42 +278,99 @@ function drawBeams(
   ctx: CanvasRenderingContext2D,
   world: World,
   time: number,
+  view: View,
 ): void {
   for (const beam of world.beams) {
     const a = world.nodes.get(beam.a);
     const b = world.nodes.get(beam.b);
     if (!a || !b) continue;
-
-    const d = Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y);
-    const stretch = Math.abs(d - beam.rest) / beam.rest;
-    const base = Math.max(0.28, Math.min(0.85, 0.68 - stretch * 0.7));
-    const seed = (beam.a * 31 + beam.b * 17) % 100;
-    const shimmer = 0.9 + 0.1 * Math.sin(time * 1.8 + seed);
-    const alpha = base * shimmer;
-
-    const mx = (a.pos.x + b.pos.x) / 2;
-    const my = (a.pos.y + b.pos.y) / 2;
-    const nx = -(b.pos.y - a.pos.y) / (d || 1);
-    const ny = (b.pos.x - a.pos.x) / (d || 1);
-    const bow = Math.min(7, d * 0.04) * (seed % 2 === 0 ? 1 : -1);
-    const cx = mx + nx * bow;
-    const cy = my + ny * bow;
-
-    ctx.beginPath();
-    ctx.moveTo(a.pos.x, a.pos.y);
-    ctx.quadraticCurveTo(cx, cy, b.pos.x, b.pos.y);
-    ctx.strokeStyle = `rgba(143, 211, 154, ${alpha})`;
-    ctx.lineWidth = 3.6;
-    ctx.lineCap = "round";
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(a.pos.x, a.pos.y);
-    ctx.quadraticCurveTo(cx, cy, b.pos.x, b.pos.y);
-    ctx.strokeStyle = `rgba(230, 255, 222, ${alpha * 0.45})`;
-    ctx.lineWidth = 1.3;
-    ctx.stroke();
+    const ax = a.pos.x;
+    const ay = a.pos.y;
+    const bx = b.pos.x;
+    const by = b.pos.y;
+    if (!segmentVisible(ax, ay, bx, by, view, 26)) continue;
+    drawGooBeam(ctx, ax, ay, bx, by, beam.rest, a.radius, time, beam.a * 31 + beam.b * 17);
   }
+}
+
+function drawGooBeam(
+  ctx: CanvasRenderingContext2D,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  rest: number,
+  aRadius: number,
+  time: number,
+  seed: number,
+): void {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const d = Math.hypot(dx, dy) || 1e-6;
+  const ux = dx / d;
+  const uy = dy / d;
+  const nx = -uy;
+  const ny = ux;
+
+  const s = seed % 1000;
+  const strain = Math.abs(d - rest) / rest;
+  const wobble = 0.5 + 0.5 * Math.sin(time * 1.6 + s * 0.7);
+  const amp = (1.6 + Math.min(4, strain * 7)) * wobble;
+  const bow = Math.min(6, d * 0.03) * (seed % 2 === 0 ? 1 : -1);
+  const baseW = Math.max(2.2, Math.min(5.2, aRadius * 0.34));
+
+  for (let i = 0; i <= BEAM_SEG; i++) {
+    const t = i / BEAM_SEG;
+    const shape = Math.sin(Math.PI * t);
+    const offset =
+      bow * shape + Math.sin(t * Math.PI * 3 + time * 2 + s) * amp * shape;
+    beamPts[i * 2] = ax + ux * d * t + nx * offset;
+    beamPts[i * 2 + 1] = ay + uy * d * t + ny * offset;
+  }
+
+  const widthAt = (t: number): number => {
+    const e = Math.abs(2 * t - 1);
+    return baseW * (0.5 + 0.95 * Math.pow(e, 1.5));
+  };
+
+  const fill = `rgba(142, 208, 150, ${Math.max(0.3, 0.62 - strain * 0.25)})`;
+
+  ctx.beginPath();
+  for (let i = 0; i <= BEAM_SEG; i++) {
+    const w = widthAt(i / BEAM_SEG);
+    const px = beamPts[i * 2] + nx * w;
+    const py = beamPts[i * 2 + 1] + ny * w;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  for (let i = BEAM_SEG; i >= 0; i--) {
+    const w = widthAt(i / BEAM_SEG);
+    ctx.lineTo(beamPts[i * 2] - nx * w, beamPts[i * 2 + 1] - ny * w);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+
+  ctx.beginPath();
+  for (let i = 0; i <= BEAM_SEG; i++) {
+    const px = beamPts[i * 2];
+    const py = beamPts[i * 2 + 1];
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.strokeStyle = `rgba(226, 250, 216, ${0.35 + 0.35 * wobble})`;
+  ctx.lineWidth = Math.max(1, baseW * 0.4);
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  const endW = widthAt(0);
+  ctx.beginPath();
+  ctx.moveTo(ax + endW, ay);
+  ctx.arc(ax, ay, endW, 0, Math.PI * 2);
+  ctx.moveTo(bx + endW, by);
+  ctx.arc(bx, by, endW, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
 }
 
 function drawBlock(
@@ -260,8 +387,8 @@ function drawBlock(
   node: Node | null,
   cameraActive = false,
 ): void {
-  if (type === "goo") {
-    drawGoo(ctx, x, y, radius, node);
+  if (type === "cell") {
+    drawCell(ctx, x, y, radius, node, time);
     return;
   }
   if (type === "thruster") {
@@ -275,12 +402,13 @@ function drawBlock(
   drawSensor(ctx, x, y, radius, running, goal, time);
 }
 
-function drawGoo(
+function drawCell(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   radius: number,
   node: Node | null,
+  time: number,
 ): void {
   let sx = 1;
   let sy = 1;
@@ -298,13 +426,30 @@ function drawGoo(
     }
   }
 
+  ctx.globalCompositeOperation = "lighter";
+  drawGlow(ctx, x, y, radius * 2.4, "rgba(120, 220, 150, 0.22)");
+  ctx.globalCompositeOperation = "source-over";
+
   ctx.save();
   ctx.translate(x, y);
   if (angle !== 0) ctx.rotate(angle);
   ctx.scale(sx, sy);
 
-  ctx.shadowColor = "rgba(120, 230, 160, 0.45)";
-  ctx.shadowBlur = 14;
+  const seed = node ? node.id * 1.37 : 0;
+  ctx.beginPath();
+  for (let i = 0; i <= CELL_SEG; i++) {
+    const a = (i / CELL_SEG) * Math.PI * 2;
+    const rr =
+      radius *
+      (1 +
+        0.055 * Math.sin(3 * a + time * 0.9 + seed) +
+        0.035 * Math.sin(5 * a - time * 1.3 + seed * 2));
+    const px = Math.cos(a) * rr;
+    const py = Math.sin(a) * rr;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
 
   const grad = ctx.createRadialGradient(
     -radius * 0.35,
@@ -317,18 +462,14 @@ function drawGoo(
   grad.addColorStop(0, LEAF_LIGHT);
   grad.addColorStop(0.55, LEAF);
   grad.addColorStop(1, LEAF_MID);
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
-  ctx.shadowBlur = 0;
-
-  ctx.strokeStyle = "rgba(26, 74, 46, 0.5)";
+  ctx.strokeStyle = "rgba(26, 74, 46, 0.45)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.arc(-radius * 0.3, -radius * 0.32, radius * 0.24, 0, Math.PI * 2);
+  ctx.arc(-radius * 0.3, -radius * 0.32, radius * 0.22, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
   ctx.fill();
 
@@ -378,12 +519,19 @@ function drawSeed(
   angle: number,
   active: boolean,
 ): void {
+  ctx.globalCompositeOperation = "lighter";
+  drawGlow(
+    ctx,
+    x,
+    y,
+    radius * 2.6,
+    active ? "rgba(255, 210, 110, 0.35)" : "rgba(255, 210, 110, 0.18)",
+  );
+  ctx.globalCompositeOperation = "source-over";
+
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
-
-  ctx.shadowColor = "rgba(255, 210, 110, 0.7)";
-  ctx.shadowBlur = active ? 18 : 10;
 
   const grad = ctx.createRadialGradient(
     -radius * 0.3,
@@ -399,7 +547,6 @@ function drawSeed(
   ctx.ellipse(0, 0, radius * 1.15, radius * 0.92, 0, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
-  ctx.shadowBlur = 0;
 
   ctx.strokeStyle = "rgba(120, 80, 20, 0.4)";
   ctx.lineWidth = 1.4;
