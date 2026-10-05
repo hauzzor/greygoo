@@ -64,6 +64,9 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 - Beams auto-form between blocks within the connect radius (slider, default
   `90`, max `320`); **stiff springs** (Advanced "Beam rigidity", default `0.9`),
   a little wobbly but **non-breaking**.
+- Beams are **solid**: a block cannot pass through a beam it is not attached to.
+  `World.solveBeamCollision` treats each beam as a capsule and pushes out any
+  node intersecting it (endpoints of the beam are ignored), using a spatial grid.
 - **Thruster thrust vector is derived live from its connected neighbours**: it
   points toward the (normalized, averaged) connected-neighbour positions. It is
   computed **once per frame** into `node.dirX/dirY` (used by both physics and

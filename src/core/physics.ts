@@ -17,6 +17,7 @@ export interface PhysicsParams {
 
 const EMPTY_BEAMS: Beam[] = [];
 const DEFAULT_RADIUS = 16;
+const BEAM_RADIUS = 5;
 
 function cellKey(cx: number, cy: number): number {
   return cx * 2000003 + cy;
@@ -244,6 +245,8 @@ export class World {
 
     for (let i = 0; i < this.params.iterations; i++) this.solveBeams();
     this.solveSeparation();
+    this.solveBeamCollision();
+    this.solveBeamCollision();
   }
 
   private solveBeams(): void {
@@ -270,6 +273,86 @@ export class World {
       a.pos.y += cy * aw;
       b.pos.x -= cx * bw;
       b.pos.y -= cy * bw;
+    }
+  }
+
+  private solveBeamCollision(): void {
+    if (this.beams.length === 0) return;
+
+    const cell = Math.max(this.maxRadius * 2, 1);
+    const expand = this.maxRadius + BEAM_RADIUS + 2;
+    const beamGrid = new Map<number, number[]>();
+
+    for (let i = 0; i < this.beams.length; i++) {
+      const beam = this.beams[i];
+      const a = this.nodes.get(beam.a);
+      const b = this.nodes.get(beam.b);
+      if (!a || !b) continue;
+
+      const cx0 = Math.floor((Math.min(a.pos.x, b.pos.x) - expand) / cell);
+      const cx1 = Math.floor((Math.max(a.pos.x, b.pos.x) + expand) / cell);
+      const cy0 = Math.floor((Math.min(a.pos.y, b.pos.y) - expand) / cell);
+      const cy1 = Math.floor((Math.max(a.pos.y, b.pos.y) + expand) / cell);
+
+      for (let cx = cx0; cx <= cx1; cx++) {
+        for (let cy = cy0; cy <= cy1; cy++) {
+          const key = cellKey(cx, cy);
+          let list = beamGrid.get(key);
+          if (!list) {
+            list = [];
+            beamGrid.set(key, list);
+          }
+          list.push(i);
+        }
+      }
+    }
+
+    for (const node of this.nodes.values()) {
+      if (node.invMass === 0) continue;
+
+      const key = cellKey(
+        Math.floor(node.pos.x / cell),
+        Math.floor(node.pos.y / cell),
+      );
+      const list = beamGrid.get(key);
+      if (!list) continue;
+
+      for (const bi of list) {
+        const beam = this.beams[bi];
+        if (beam.a === node.id || beam.b === node.id) continue;
+
+        const a = this.nodes.get(beam.a);
+        const b = this.nodes.get(beam.b);
+        if (!a || !b) continue;
+
+        const ex = b.pos.x - a.pos.x;
+        const ey = b.pos.y - a.pos.y;
+        const len2 = ex * ex + ey * ey || 1e-6;
+
+        let t = ((node.pos.x - a.pos.x) * ex + (node.pos.y - a.pos.y) * ey) / len2;
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
+
+        const cxp = a.pos.x + ex * t;
+        const cyp = a.pos.y + ey * t;
+
+        let dx = node.pos.x - cxp;
+        let dy = node.pos.y - cyp;
+        let d = Math.hypot(dx, dy);
+        const min = node.radius + BEAM_RADIUS;
+        if (d >= min) continue;
+
+        if (d < 1e-4) {
+          const inv = 1 / Math.sqrt(len2);
+          dx = -ey * inv;
+          dy = ex * inv;
+          d = 1e-4;
+        }
+
+        const push = min - d;
+        node.pos.x += (dx / d) * push;
+        node.pos.y += (dy / d) * push;
+      }
     }
   }
 
