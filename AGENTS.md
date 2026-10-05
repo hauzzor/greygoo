@@ -12,6 +12,24 @@ autonomously.
 - Custom Verlet physics with soft distance constraints (no external physics lib).
 - No runtime dependencies.
 
+## Look & feel
+
+Friendly, organic forest-puddle aesthetic (not scientific). Light forest-green
+gradient background with dappled light; soft, glowing organic shapes.
+
+- Goo ball = green droplet with gloss and velocity-based squash/stretch.
+- Thruster = warm firefly/seed that leaves a soft glowing plume.
+- Sensor = blossom; draws a faint warm "scent trail" to the goal in sim.
+- Beams = translucent moss strands with a highlight core and a slight organic
+  bow (visual only — physics stays straight).
+- Goal = pulsing sunbeam patch with expanding ripple rings and a blossom centre
+  (no crosshair).
+- Calm ambient life: drifting pollen motes and occasional rising bubbles.
+- UI is frosted light-green glass (HUD stays visible), leaf-green accents.
+
+All effects are procedural (Canvas 2D + a small particle pool); no image,
+audio, or font assets.
+
 ## Commands
 
 Node LTS is installed at `C:\Program Files\nodejs`. The `.ps1` npm shim is
@@ -34,8 +52,8 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 
 - 2D, top-down, zero-g petri dish with fluid drag (no gravity).
 - Blocks: **Goo ball**, **Thruster**, **Sensor**.
-- Beams auto-form between blocks within the connect radius; soft/wobbly and
-  **non-breaking**.
+- Beams auto-form between blocks within the connect radius (slider, default
+  `90`, max `320`); soft/wobbly and **non-breaking**.
 - **Thruster thrust vector is derived live from its connected neighbours**: it
   points toward the (normalized, averaged) connected-neighbour positions and is
   recomputed every frame. A thruster with no neighbours produces no thrust.
@@ -73,8 +91,10 @@ src/core/cell.ts      connectivity BFS, autoConnect, previewConnections, thrustD
 src/game/level.ts     goal definition
 src/game/editor.ts    BLOCK_RADIUS, placeBlock
 src/game/simulation.ts applyGuidance (sensor->thrusters), checkWin
-src/render/camera.ts  pan/zoom, world<->screen, follow
-src/render/renderer.ts grid, goal, beams, blocks, ghost preview
+src/game/effects.ts   ambient life, thruster exhaust, placement/launch/win FX
+src/render/camera.ts  pan/zoom, world<->screen, follow, win "kick" punch
+src/render/particles.ts pooled particle system (world-space, additive glow)
+src/render/renderer.ts forest background, goal, beams, organic blocks, ghost
 src/ui/hud.ts         DOM wiring for palette/sliders/stats, hint text
 ```
 
@@ -87,6 +107,15 @@ src/ui/hud.ts         DOM wiring for palette/sliders/stats, hint text
    `C:\Users\phili\.local\share\opencode\opencode.db`; use the session picker /
    `--continue` in opencode. The DB also records the earlier planning session.
 
+## Deploy (GitHub Pages)
+
+Remote: `https://github.com/hauzzor/greygoo.git`, branch `main`. Pushing to
+`main` triggers `.github/workflows/deploy.yml` (build + deploy). Live at
+`https://hauzzor.github.io/greygoo/` — `vite.config.ts` sets `base: /greygoo/`
+for builds. Pages must be enabled once in repo Settings → Pages → Source:
+**GitHub Actions** (the first workflow run failed at "Setup Pages" before it
+was enabled).
+
 ## Possible next steps
 
 - Goal placement in the editor (drag the goal marker) instead of fixed `(760,0)`.
@@ -94,4 +123,5 @@ src/ui/hud.ts         DOM wiring for palette/sliders/stats, hint text
 - Breakable beams under stress (World of Goo style) — currently soft but permanent.
 - Thruster power / fuel budget and per-level build limits.
 - Save/load cell designs (JSON / localStorage).
-- Sound and visual polish (trails, particles, win animation).
+- Sound (procedural Web Audio, no assets) — visuals/particles are done, audio
+  is not yet implemented.

@@ -1,12 +1,15 @@
 :root {
-  --bg: #0b0e14;
-  --panel: rgba(17, 21, 30, 0.82);
-  --border: rgba(120, 140, 180, 0.18);
-  --text: #d7deea;
-  --muted: #7d8798;
-  --accent: #59edc7;
-  --accent-dim: rgba(89, 237, 199, 0.16);
-  --warn: #ff5c8a;
+  --bg-deep: #0e2a1c;
+  --bg-mid: #1c4a2f;
+  --bg-light: #3a7d52;
+  --panel: rgba(242, 252, 238, 0.72);
+  --panel-solid: rgba(240, 250, 235, 0.92);
+  --border: rgba(44, 80, 52, 0.16);
+  --text: #24402c;
+  --muted: #5d7d66;
+  --accent: #4f9d62;
+  --accent-dim: rgba(95, 181, 111, 0.18);
+  --gold: #cf9a34;
   --font: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
@@ -19,12 +22,21 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg);
   color: var(--text);
   font-family: var(--font);
   font-size: 13px;
   user-select: none;
   -webkit-user-select: none;
+}
+
+body {
+  background:
+    radial-gradient(
+      125% 125% at 50% 38%,
+      var(--bg-light) 0%,
+      var(--bg-mid) 34%,
+      var(--bg-deep) 100%
+    );
 }
 
 #stage {
@@ -50,8 +62,9 @@ body {
   padding: 8px 10px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 22px rgba(14, 42, 28, 0.18);
 }
 
 .brand {
@@ -81,29 +94,31 @@ body {
 .btn {
   appearance: none;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.4);
   color: var(--text);
   padding: 6px 11px;
-  border-radius: 8px;
+  border-radius: 9px;
   font: inherit;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s,
+    transform 0.12s;
 }
 
 .seg:hover,
 .btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
 }
 
 .seg.active {
   background: var(--accent-dim);
-  border-color: rgba(89, 237, 199, 0.5);
+  border-color: rgba(79, 157, 98, 0.5);
   color: var(--accent);
 }
 
 .btn.primary {
   background: var(--accent-dim);
-  border-color: rgba(89, 237, 199, 0.5);
+  border-color: rgba(79, 157, 98, 0.5);
   color: var(--accent);
   font-weight: 600;
 }
@@ -116,11 +131,12 @@ body {
   border-radius: 999px;
   border: 1px solid var(--border);
   color: var(--muted);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .stage-pill.sim {
-  color: var(--warn);
-  border-color: rgba(255, 92, 138, 0.5);
+  color: var(--gold);
+  border-color: rgba(207, 154, 52, 0.5);
 }
 
 .hud-panel {
@@ -133,8 +149,9 @@ body {
   padding: 14px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 22px rgba(14, 42, 28, 0.18);
 }
 
 .field {
@@ -183,9 +200,11 @@ input[type="range"] {
   padding: 7px 12px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 11px;
   color: var(--muted);
   max-width: 70vw;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 22px rgba(14, 42, 28, 0.18);
 }
 
 .hud-bottom b {
@@ -199,18 +218,44 @@ input[type="range"] {
   transform: translate(-50%, -50%);
   z-index: 20;
   padding: 22px 44px;
-  border-radius: 16px;
-  background: rgba(12, 16, 24, 0.9);
-  border: 1px solid rgba(255, 92, 138, 0.5);
-  color: var(--warn);
+  border-radius: 18px;
+  background: var(--panel-solid);
+  border: 1px solid rgba(207, 154, 52, 0.5);
+  color: var(--gold);
   font-size: 30px;
   font-weight: 700;
   letter-spacing: 3px;
-  box-shadow: 0 0 60px rgba(255, 92, 138, 0.25);
+  box-shadow: 0 0 60px rgba(207, 154, 52, 0.28);
   transition: opacity 0.25s;
+}
+
+.banner:not(.hidden) {
+  animation: banner-in 0.5s cubic-bezier(0.2, 1.2, 0.3, 1) both;
 }
 
 .banner.hidden {
   opacity: 0;
   pointer-events: none;
+}
+
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner:not(.hidden) {
+    animation: none;
+  }
+
+  .seg:hover,
+  .btn:hover {
+    transform: none;
+  }
 }

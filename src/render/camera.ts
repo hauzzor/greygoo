@@ -6,6 +6,7 @@ export class Camera {
   scale = 1;
   width = 0;
   height = 0;
+  kick = 0;
 
   toWorld(sx: number, sy: number): Vec2 {
     return {
@@ -25,5 +26,13 @@ export class Camera {
   follow(target: Vec2, t: number): void {
     this.x += (target.x - this.x) * t;
     this.y += (target.y - this.y) * t;
+  }
+
+  punch(amount: number): void {
+    this.kick = Math.min(0.18, this.kick + amount);
+  }
+
+  decayKick(dt: number): void {
+    this.kick *= Math.exp(-7 * dt);
   }
 }

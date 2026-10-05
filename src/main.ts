@@ -3,10 +3,18 @@ import { World } from "./core/physics";
 import { autoConnect, previewConnections } from "./core/cell";
 import type { BlockType, Ghost, Stage, Tool } from "./core/types";
 import { Camera } from "./render/camera";
+import { Particles } from "./render/particles";
 import { render } from "./render/renderer";
 import { createGoal } from "./game/level";
 import { BLOCK_RADIUS, placeBlock } from "./game/editor";
 import { applyGuidance, checkWin } from "./game/simulation";
+import {
+  emitLaunchPoof,
+  emitPlacementPop,
+  emitThrusterExhaust,
+  emitWinBurst,
+  updateAmbientLife,
+} from "./game/effects";
 import { createHud } from "./ui/hud";
 
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
@@ -16,6 +24,7 @@ const ctx: CanvasRenderingContext2D = context;
 
 const world = new World();
 const camera = new Camera();
+const particles = new Particles();
 const goal = createGoal();
 
 let stage: Stage = "editor";
@@ -35,6 +44,7 @@ const hud = createHud({
   onReset: () => resetToEditor(),
   onClear: () => {
     world.clear();
+    particles.clear();
     selectedId = null;
     ghost = null;
     editorSnapshot.clear();
@@ -51,6 +61,9 @@ function setTool(t: Tool): void {
 function launch(): void {
   if (stage === "sim" || world.nodes.size === 0) return;
   ghost = null;
+  particles.clear();
+  const c = world.centroid();
+  emitLaunchPoof(particles, c.x, c.y);
   editorSnapshot = new Map();
   for (const node of world.nodes.values()) {
     editorSnapshot.set(node.id, { x: node.pos.x, y: node.pos.y });
@@ -62,6 +75,7 @@ function launch(): void {
 
 function resetToEditor(): void {
   ghost = null;
+  particles.clear();
   for (const node of world.nodes.values()) {
     const saved = editorSnapshot.get(node.id);
     if (saved) {
@@ -85,6 +99,7 @@ function resetToEditor(): void {
 
 function startNewGame(): void {
   world.clear();
+  particles.clear();
   selectedId = null;
   ghost = null;
   editorSnapshot.clear();
@@ -208,6 +223,7 @@ function endPointer(): void {
     ghost = null;
     const node = placeBlock(world, g.type, g.pos);
     autoConnect(world, node.id, hud.params().connectRadius);
+    emitPlacementPop(particles, node.pos.x, node.pos.y);
     selectedId = node.id;
     return;
   }
@@ -274,6 +290,7 @@ let accumulator = 0;
 function update(dt: number): void {
   const p = hud.params();
   world.params.stiffness = p.stiffness;
+  camera.decayKick(dt);
 
   if (stage === "editor") {
     world.params.damping = 0.99;
@@ -284,13 +301,21 @@ function update(dt: number): void {
 
   world.step(dt);
 
+  updateAmbientLife(particles, camera, dt);
+
   if (stage === "sim") {
+    emitThrusterExhaust(world, particles, dt);
+
     if (!won && checkWin(world, goal)) {
       won = true;
       hud.banner("GOAL REACHED");
+      emitWinBurst(particles, goal);
+      camera.punch(0.08);
     }
     if (!won) camera.follow(world.centroid(), 0.04);
   }
+
+  particles.update(dt);
 }
 
 function draw(): void {
@@ -299,14 +324,21 @@ function draw(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
-  render(ctx, camera, world, goal, {
-    stage,
-    selectedId,
-    connectRadius: hud.params().connectRadius,
-    time: performance.now() / 1000,
-    won,
-    ghost,
-  });
+  render(
+    ctx,
+    camera,
+    world,
+    goal,
+    {
+      stage,
+      selectedId,
+      connectRadius: hud.params().connectRadius,
+      time: performance.now() / 1000,
+      won,
+      ghost,
+    },
+    particles,
+  );
 
   const c = world.centroid();
   const distance =

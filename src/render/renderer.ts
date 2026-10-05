@@ -4,6 +4,7 @@ import type { Ghost, Goal, Node, Stage } from "../core/types";
 import type { Vec2 } from "../core/vec2";
 import { thrustDirection } from "../core/cell";
 import { BLOCK_RADIUS } from "../game/editor";
+import type { Particles } from "./particles";
 
 export interface RenderState {
   stage: Stage;
@@ -14,11 +15,26 @@ export interface RenderState {
   ghost: Ghost | null;
 }
 
-const GOO = "#58d68d";
-const GOO_DARK = "#1f6b45";
-const THRUST = "#f5a623";
-const SENSOR = "#4dd0e1";
-const GOAL = "#ff5c8a";
+const LEAF_LIGHT = "#eafbe0";
+const LEAF = "#7fd992";
+const LEAF_MID = "#4aa863";
+const FIREFLY_HOT = "#fff2b8";
+const FIREFLY_DEEP = "#e8a92e";
+const PETAL = "#e6d4ff";
+const PETAL_CORE = "#fff7c2";
+const SUNBEAM = "#ffe9a8";
+const SUNBEAM_RING = "#f7d774";
+const HALO = "#a9e6b0";
+
+function hexA(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+function hash2(x: number, y: number): number {
+  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+}
 
 export function render(
   ctx: CanvasRenderingContext2D,
@@ -26,20 +42,37 @@ export function render(
   world: World,
   goal: Goal,
   state: RenderState,
+  particles: Particles,
 ): void {
   const { width, height } = camera;
+  const scale = camera.scale * (1 + camera.kick);
+
   ctx.save();
   ctx.translate(width / 2, height / 2);
-  ctx.scale(camera.scale, camera.scale);
+  ctx.scale(scale, scale);
   ctx.translate(-camera.x, -camera.y);
 
-  drawGrid(ctx, camera);
+  drawBackground(ctx, camera, state.time);
   drawGoal(ctx, goal, state.time);
-  drawBeams(ctx, world);
+  particles.draw(ctx);
+  drawBeams(ctx, world, state.time);
 
   for (const node of world.nodes.values()) {
-    const dir = node.type === "thruster" ? thrustDirection(world, node.id) : null;
-    drawBlock(ctx, node.type, node.pos.x, node.pos.y, node.radius, dir, node.firing, state.stage, goal);
+    const dir =
+      node.type === "thruster" ? thrustDirection(world, node.id) : null;
+    drawBlock(
+      ctx,
+      node.type,
+      node.pos.x,
+      node.pos.y,
+      node.radius,
+      dir,
+      node.firing,
+      state.stage,
+      goal,
+      state.time,
+      node,
+    );
   }
 
   if (state.selectedId !== null) {
@@ -48,27 +81,31 @@ export function render(
       ctx.beginPath();
       ctx.arc(sel.pos.x, sel.pos.y, state.connectRadius, 0, Math.PI * 2);
       ctx.setLineDash([6 / camera.scale, 6 / camera.scale]);
-      ctx.strokeStyle = "rgba(89, 237, 199, 0.35)";
+      ctx.strokeStyle = "rgba(169, 230, 176, 0.35)";
       ctx.lineWidth = 1.5 / camera.scale;
       ctx.stroke();
       ctx.setLineDash([]);
 
       ctx.beginPath();
       ctx.arc(sel.pos.x, sel.pos.y, sel.radius + 5, 0, Math.PI * 2);
-      ctx.strokeStyle = "#59edc7";
+      ctx.strokeStyle = HALO;
       ctx.lineWidth = 2 / camera.scale;
       ctx.stroke();
     }
   }
 
   if (state.ghost) {
-    drawGhost(ctx, camera, world, state.ghost, state.connectRadius);
+    drawGhost(ctx, camera, world, state.ghost, state.connectRadius, state.time);
   }
 
   ctx.restore();
 }
 
-function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera): void {
+function drawBackground(
+  ctx: CanvasRenderingContext2D,
+  camera: Camera,
+  time: number,
+): void {
   const halfW = camera.width / 2 / camera.scale;
   const halfH = camera.height / 2 / camera.scale;
   const x0 = camera.x - halfW;
@@ -76,56 +113,95 @@ function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera): void {
   const y0 = camera.y - halfH;
   const y1 = camera.y + halfH;
 
-  const step = 50;
-  ctx.beginPath();
-  for (let x = Math.floor(x0 / step) * step; x <= x1; x += step) {
-    ctx.moveTo(x, y0);
-    ctx.lineTo(x, y1);
+  const cell = 560;
+  for (let gx = Math.floor(x0 / cell); gx <= Math.floor(x1 / cell); gx++) {
+    for (let gy = Math.floor(y0 / cell); gy <= Math.floor(y1 / cell); gy++) {
+      const h = hash2(gx, gy);
+      const h2 = hash2(gx + 17, gy - 9);
+      const cx = (gx + 0.2 + h * 0.6) * cell;
+      const cy = (gy + 0.2 + h2 * 0.6) * cell;
+      const r = 200 + h * 190;
+      const pulse = 0.5 + 0.5 * Math.sin(time * 0.25 + h * 6.283);
+      const alpha = 0.03 + 0.035 * pulse;
+
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, hexA(LEAF_LIGHT, alpha));
+      grad.addColorStop(1, hexA(LEAF_LIGHT, 0));
+      ctx.fillStyle = grad;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
   }
-  for (let y = Math.floor(y0 / step) * step; y <= y1; y += step) {
-    ctx.moveTo(x0, y);
-    ctx.lineTo(x1, y);
-  }
-  ctx.strokeStyle = "rgba(120, 140, 180, 0.08)";
-  ctx.lineWidth = 1 / camera.scale;
-  ctx.stroke();
 }
 
 function drawGoal(ctx: CanvasRenderingContext2D, goal: Goal, time: number): void {
-  const pulse = 1 + Math.sin(time * 2) * 0.06;
-  const grad = ctx.createRadialGradient(
-    goal.pos.x,
-    goal.pos.y,
-    0,
-    goal.pos.x,
-    goal.pos.y,
-    goal.radius,
-  );
-  grad.addColorStop(0, "rgba(255, 92, 138, 0.28)");
-  grad.addColorStop(1, "rgba(255, 92, 138, 0)");
+  const { x, y } = goal.pos;
+  const r = goal.radius;
 
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 1.35);
+  glow.addColorStop(0, hexA(SUNBEAM, 0.34));
+  glow.addColorStop(0.55, hexA(SUNBEAM, 0.14));
+  glow.addColorStop(1, hexA(SUNBEAM, 0));
   ctx.beginPath();
-  ctx.arc(goal.pos.x, goal.pos.y, goal.radius, 0, Math.PI * 2);
-  ctx.fillStyle = grad;
+  ctx.arc(x, y, r * 1.35, 0, Math.PI * 2);
+  ctx.fillStyle = glow;
   ctx.fill();
 
-  ctx.beginPath();
-  ctx.arc(goal.pos.x, goal.pos.y, goal.radius * pulse, 0, Math.PI * 2);
-  ctx.strokeStyle = GOAL;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
+  for (let i = 0; i < 3; i++) {
+    const t = (time * 0.28 + i / 3) % 1;
+    const rr = r * 0.25 + t * r * 1.15;
+    ctx.beginPath();
+    ctx.arc(x, y, rr, 0, Math.PI * 2);
+    ctx.strokeStyle = hexA(SUNBEAM_RING, (1 - t) * 0.3);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 
+  const pool = ctx.createRadialGradient(x, y, 0, x, y, r * 0.8);
+  pool.addColorStop(0, hexA(SUNBEAM, 0.5));
+  pool.addColorStop(1, hexA(SUNBEAM, 0));
   ctx.beginPath();
-  ctx.moveTo(goal.pos.x - 10, goal.pos.y);
-  ctx.lineTo(goal.pos.x + 10, goal.pos.y);
-  ctx.moveTo(goal.pos.x, goal.pos.y - 10);
-  ctx.lineTo(goal.pos.x, goal.pos.y + 10);
-  ctx.strokeStyle = "rgba(255, 92, 138, 0.8)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
+  ctx.fillStyle = pool;
+  ctx.fill();
+
+  drawBlossom(ctx, x, y, r * 0.28, time, SUNBEAM_RING, PETAL_CORE);
 }
 
-function drawBeams(ctx: CanvasRenderingContext2D, world: World): void {
+function drawBlossom(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  time: number,
+  petalColor: string,
+  coreColor: string,
+): void {
+  const petals = 5;
+  const rot = time * 0.15;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  for (let i = 0; i < petals; i++) {
+    const a = rot + (i / petals) * Math.PI * 2;
+    const px = x + Math.cos(a) * radius * 0.7;
+    const py = y + Math.sin(a) * radius * 0.7;
+    ctx.beginPath();
+    ctx.arc(px, py, radius * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = petalColor;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.5, 0, Math.PI * 2);
+  ctx.fillStyle = coreColor;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBeams(
+  ctx: CanvasRenderingContext2D,
+  world: World,
+  time: number,
+): void {
   for (const beam of world.beams) {
     const a = world.nodes.get(beam.a);
     const b = world.nodes.get(beam.b);
@@ -133,21 +209,32 @@ function drawBeams(ctx: CanvasRenderingContext2D, world: World): void {
 
     const d = Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y);
     const stretch = Math.abs(d - beam.rest) / beam.rest;
-    const alpha = Math.max(0.25, Math.min(0.9, 0.7 - stretch * 0.8));
+    const base = Math.max(0.28, Math.min(0.85, 0.68 - stretch * 0.7));
+    const seed = (beam.a * 31 + beam.b * 17) % 100;
+    const shimmer = 0.9 + 0.1 * Math.sin(time * 1.8 + seed);
+    const alpha = base * shimmer;
+
+    const mx = (a.pos.x + b.pos.x) / 2;
+    const my = (a.pos.y + b.pos.y) / 2;
+    const nx = -(b.pos.y - a.pos.y) / (d || 1);
+    const ny = (b.pos.x - a.pos.x) / (d || 1);
+    const bow = Math.min(7, d * 0.04) * (seed % 2 === 0 ? 1 : -1);
+    const cx = mx + nx * bow;
+    const cy = my + ny * bow;
 
     ctx.beginPath();
     ctx.moveTo(a.pos.x, a.pos.y);
-    ctx.lineTo(b.pos.x, b.pos.y);
-    ctx.strokeStyle = `rgba(110, 224, 170, ${alpha})`;
-    ctx.lineWidth = 3.5;
+    ctx.quadraticCurveTo(cx, cy, b.pos.x, b.pos.y);
+    ctx.strokeStyle = `rgba(143, 211, 154, ${alpha})`;
+    ctx.lineWidth = 3.6;
     ctx.lineCap = "round";
     ctx.stroke();
 
     ctx.beginPath();
     ctx.moveTo(a.pos.x, a.pos.y);
-    ctx.lineTo(b.pos.x, b.pos.y);
-    ctx.strokeStyle = `rgba(200, 255, 230, ${alpha * 0.35})`;
-    ctx.lineWidth = 1.2;
+    ctx.quadraticCurveTo(cx, cy, b.pos.x, b.pos.y);
+    ctx.strokeStyle = `rgba(230, 255, 222, ${alpha * 0.45})`;
+    ctx.lineWidth = 1.3;
     ctx.stroke();
   }
 }
@@ -162,37 +249,78 @@ function drawBlock(
   firing: number,
   stage: Stage,
   goal: Goal,
+  time: number,
+  node: Node | null,
 ): void {
   if (type === "goo") {
-    drawGoo(ctx, x, y, radius);
+    drawGoo(ctx, x, y, radius, node);
     return;
   }
   if (type === "thruster") {
     drawThruster(ctx, x, y, radius, dir, firing);
     return;
   }
-  drawSensor(ctx, x, y, radius, stage, goal);
+  drawSensor(ctx, x, y, radius, stage, goal, time);
 }
 
-function drawGoo(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
+function drawGoo(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  node: Node | null,
+): void {
+  let sx = 1;
+  let sy = 1;
+  let angle = 0;
+
+  if (node) {
+    const vx = node.pos.x - node.prev.x;
+    const vy = node.pos.y - node.prev.y;
+    const speed = Math.hypot(vx, vy);
+    if (speed > 0.4) {
+      const amt = Math.min(0.22, speed * 0.02);
+      sx = 1 + amt;
+      sy = 1 - amt;
+      angle = Math.atan2(vy, vx);
+    }
+  }
+
+  ctx.save();
+  ctx.translate(x, y);
+  if (angle !== 0) ctx.rotate(angle);
+  ctx.scale(sx, sy);
+
+  ctx.shadowColor = "rgba(120, 230, 160, 0.45)";
+  ctx.shadowBlur = 14;
+
   const grad = ctx.createRadialGradient(
-    x - radius * 0.35,
-    y - radius * 0.35,
-    radius * 0.15,
-    x,
-    y,
+    -radius * 0.35,
+    -radius * 0.35,
+    radius * 0.1,
+    0,
+    0,
     radius,
   );
-  grad.addColorStop(0, "#a9f0c8");
-  grad.addColorStop(0.6, GOO);
-  grad.addColorStop(1, GOO_DARK);
+  grad.addColorStop(0, LEAF_LIGHT);
+  grad.addColorStop(0.55, LEAF);
+  grad.addColorStop(1, LEAF_MID);
   ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
-  ctx.strokeStyle = "rgba(10, 30, 20, 0.5)";
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = "rgba(26, 74, 46, 0.5)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(-radius * 0.3, -radius * 0.32, radius * 0.24, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.fill();
+
+  ctx.restore();
 }
 
 function drawThruster(
@@ -203,46 +331,73 @@ function drawThruster(
   dir: Vec2 | null,
   firing: number,
 ): void {
+  const active = firing > 0.01;
   if (!dir) {
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(245, 166, 35, 0.7)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(60, 35, 0, 0.6)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    drawSeed(ctx, x, y, radius, 0, active);
     return;
   }
 
   const angle = Math.atan2(dir.y, dir.x);
 
-  if (firing > 0.01) {
-    const len = 12 + firing * 30;
+  if (active) {
+    const len = 14 + firing * 34;
     const bx = x - Math.cos(angle) * (radius + len);
     const by = y - Math.sin(angle) * (radius + len);
+    const grad = ctx.createLinearGradient(x, y, bx, by);
+    grad.addColorStop(0, `rgba(255, 236, 160, ${0.5 + firing * 0.4})`);
+    grad.addColorStop(1, "rgba(255, 200, 90, 0)");
     ctx.beginPath();
     ctx.moveTo(x - Math.cos(angle) * radius, y - Math.sin(angle) * radius);
     ctx.lineTo(bx, by);
-    ctx.strokeStyle = `rgba(255, 190, 80, ${0.5 + firing * 0.5})`;
-    ctx.lineWidth = 3 + firing * 5;
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 4 + firing * 7;
     ctx.lineCap = "round";
     ctx.stroke();
   }
 
+  drawSeed(ctx, x, y, radius, angle, active);
+}
+
+function drawSeed(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  angle: number,
+  active: boolean,
+): void {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
+
+  ctx.shadowColor = "rgba(255, 210, 110, 0.7)";
+  ctx.shadowBlur = active ? 18 : 10;
+
+  const grad = ctx.createRadialGradient(
+    -radius * 0.3,
+    -radius * 0.3,
+    radius * 0.15,
+    0,
+    0,
+    radius * 1.1,
+  );
+  grad.addColorStop(0, active ? FIREFLY_HOT : "#ffe9a8");
+  grad.addColorStop(1, FIREFLY_DEEP);
   ctx.beginPath();
-  ctx.moveTo(radius + 6, 0);
-  ctx.lineTo(-radius, radius * 0.85);
-  ctx.lineTo(-radius * 0.4, 0);
-  ctx.lineTo(-radius, -radius * 0.85);
-  ctx.closePath();
-  ctx.fillStyle = firing > 0.01 ? "#ffcf6b" : THRUST;
+  ctx.ellipse(0, 0, radius * 1.15, radius * 0.92, 0, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
   ctx.fill();
-  ctx.strokeStyle = "rgba(60, 35, 0, 0.6)";
-  ctx.lineWidth = 1.5;
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = "rgba(120, 80, 20, 0.4)";
+  ctx.lineWidth = 1.4;
   ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(-radius * 0.28, -radius * 0.3, radius * 0.2, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+  ctx.fill();
+
   ctx.restore();
 }
 
@@ -253,30 +408,20 @@ function drawSensor(
   radius: number,
   stage: Stage,
   goal: Goal,
+  time: number,
 ): void {
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(10, 40, 46, 0.9)";
-  ctx.fill();
-  ctx.strokeStyle = SENSOR;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(x, y, radius * 0.4, 0, Math.PI * 2);
-  ctx.fillStyle = SENSOR;
-  ctx.fill();
-
   if (stage === "sim") {
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(goal.pos.x, goal.pos.y);
-    ctx.setLineDash([5, 6]);
-    ctx.strokeStyle = "rgba(77, 208, 225, 0.4)";
+    ctx.setLineDash([4, 8]);
+    ctx.strokeStyle = "rgba(255, 240, 190, 0.35)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.setLineDash([]);
   }
+
+  drawBlossom(ctx, x, y, radius, time, PETAL, PETAL_CORE);
 }
 
 function ghostDirection(world: World, ghost: Ghost): Vec2 | null {
@@ -308,6 +453,7 @@ function drawGhost(
   world: World,
   ghost: Ghost,
   connectRadius: number,
+  time: number,
 ): void {
   ctx.save();
   ctx.globalAlpha = 0.85;
@@ -319,7 +465,7 @@ function drawGhost(
     ctx.moveTo(ghost.pos.x, ghost.pos.y);
     ctx.lineTo(other.pos.x, other.pos.y);
     ctx.setLineDash([5 / camera.scale, 5 / camera.scale]);
-    ctx.strokeStyle = "rgba(89, 237, 199, 0.8)";
+    ctx.strokeStyle = "rgba(169, 230, 176, 0.8)";
     ctx.lineWidth = 2.5 / camera.scale;
     ctx.stroke();
     ctx.setLineDash([]);
@@ -328,7 +474,7 @@ function drawGhost(
   ctx.beginPath();
   ctx.arc(ghost.pos.x, ghost.pos.y, connectRadius, 0, Math.PI * 2);
   ctx.setLineDash([4 / camera.scale, 7 / camera.scale]);
-  ctx.strokeStyle = "rgba(89, 237, 199, 0.3)";
+  ctx.strokeStyle = "rgba(169, 230, 176, 0.3)";
   ctx.lineWidth = 1.2 / camera.scale;
   ctx.stroke();
   ctx.setLineDash([]);
@@ -336,10 +482,19 @@ function drawGhost(
   ctx.globalAlpha = 0.55;
   const radius = BLOCK_RADIUS[ghost.type];
   const dir = ghost.type === "thruster" ? ghostDirection(world, ghost) : null;
-  drawBlock(ctx, ghost.type, ghost.pos.x, ghost.pos.y, radius, dir, 0, "editor", {
-    pos: ghost.pos,
-    radius: 0,
-  });
+  drawBlock(
+    ctx,
+    ghost.type,
+    ghost.pos.x,
+    ghost.pos.y,
+    radius,
+    dir,
+    0,
+    "editor",
+    { pos: ghost.pos, radius: 0 },
+    time,
+    null,
+  );
 
   ctx.restore();
 }
