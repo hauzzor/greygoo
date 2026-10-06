@@ -32,7 +32,7 @@ const CAMERA_DARK = "#2f6f68";
 
 const CELL_SEG = 12;
 const BEAM_SEG = 6;
-const BG_SIZE = 1024;
+const BG_SIZE = 512;
 const beamPts = new Float32Array((BEAM_SEG + 1) * 2);
 
 function hexA(hex: string, alpha: number): string {

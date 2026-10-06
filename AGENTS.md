@@ -35,7 +35,10 @@ gradient background with dappled light; soft, glowing organic shapes.
 All effects are procedural (Canvas 2D + a small particle pool); no image,
 audio, or font assets. Performance matters (target 300+ blocks): soft glows and
 the background come from **cached offscreen sprites/tiles**, all `shadowBlur`
-is avoided, and blocks/beams/particles are **viewport-culled**.
+is avoided, blocks/beams/particles are **viewport-culled**, the canvas uses a
+**pixel budget** (≤2.5M px) to cap fill cost, and the HUD avoids
+`backdrop-filter` (which forces a per-frame blur of the animating canvas). A
+live **FPS/UPS/ms** tracker sits bottom-right.
 
 ## Commands
 

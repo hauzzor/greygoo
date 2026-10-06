@@ -346,15 +346,18 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+const MAX_PIXELS = 2_500_000;
 function resize(): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   camera.width = window.innerWidth;
   camera.height = window.innerHeight;
-  canvas.width = Math.floor(camera.width * dpr);
-  canvas.height = Math.floor(camera.height * dpr);
+  const budget = Math.sqrt(MAX_PIXELS / (camera.width * camera.height));
+  const scale = Math.min(dpr, Math.max(0.7, budget));
+  canvas.width = Math.floor(camera.width * scale);
+  canvas.height = Math.floor(camera.height * scale);
   canvas.style.width = `${camera.width}px`;
   canvas.style.height = `${camera.height}px`;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
 }
 window.addEventListener("resize", resize);
 resize();
@@ -363,6 +366,9 @@ const DT = 1 / 60;
 let last = performance.now();
 let accumulator = 0;
 let fpsSmooth = 60;
+let upsSmooth = 60;
+let msSmooth = 16.7;
+let lastPerf = 0;
 
 function update(dt: number): void {
   const p = hud.params();
@@ -416,14 +422,25 @@ function draw(): void {
   const c = world.centroid();
   const distance =
     world.nodes.size > 0 ? Math.hypot(goal.pos.x - c.x, goal.pos.y - c.y) : null;
-  hud.setStats(world.nodes.size, world.beams.length, distance, fpsSmooth);
+  hud.setStats(world.nodes.size, world.beams.length, distance);
+
+  const now = performance.now();
+  if (now - lastPerf > 150) {
+    lastPerf = now;
+    hud.setPerf(fpsSmooth, upsSmooth, msSmooth);
+  }
 }
 
 function frame(now: number): void {
   const raw = (now - last) / 1000;
   const elapsed = Math.min(0.05, raw);
-  if (raw > 0) fpsSmooth += (1 / raw - fpsSmooth) * 0.1;
   last = now;
+
+  if (raw > 0) {
+    fpsSmooth += (1 / raw - fpsSmooth) * 0.1;
+    msSmooth += (raw * 1000 - msSmooth) * 0.1;
+  }
+
   accumulator += elapsed;
 
   let steps = 0;
@@ -432,6 +449,8 @@ function frame(now: number): void {
     accumulator -= DT;
     steps++;
   }
+
+  if (raw > 0) upsSmooth += (steps / raw - upsSmooth) * 0.1;
 
   draw();
   requestAnimationFrame(frame);

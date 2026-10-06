@@ -25,12 +25,8 @@ export interface Hud {
   setRunning: (running: boolean) => void;
   setCameraLock: (locked: boolean) => void;
   setCameraOptions: (options: CameraOption[], selectedId: number | null) => void;
-  setStats: (
-    nodes: number,
-    beams: number,
-    distance: number | null,
-    fps: number,
-  ) => void;
+  setStats: (nodes: number, beams: number, distance: number | null) => void;
+  setPerf: (fps: number, ups: number, ms: number) => void;
   banner: (text: string | null) => void;
   setToolActive: (tool: Tool) => void;
   getTool: () => Tool;
@@ -67,7 +63,7 @@ export function createHud(handlers: HudHandlers): Hud {
   const statNodes = el<HTMLElement>("stat-nodes");
   const statBeams = el<HTMLElement>("stat-beams");
   const statDist = el<HTMLElement>("stat-dist");
-  const statFps = el<HTMLElement>("stat-fps");
+  const perfEl = el<HTMLDivElement>("perf");
 
   let activeTool: Tool = "cell";
   let optionsKey = "";
@@ -134,11 +130,16 @@ export function createHud(handlers: HudHandlers): Hud {
       cameraSelect.disabled = options.length === 0;
       cameraBtn.disabled = options.length === 0;
     },
-    setStats(nodes, beams, distance, fps) {
+    setStats(nodes, beams, distance) {
       statNodes.textContent = String(nodes);
       statBeams.textContent = String(beams);
       statDist.textContent = distance === null ? "–" : `${Math.round(distance)} px`;
-      statFps.textContent = String(Math.round(fps));
+    },
+    setPerf(fps, ups, ms) {
+      perfEl.textContent =
+        `FPS ${Math.round(fps)} · UPS ${Math.round(ups)} · ${ms.toFixed(1)} ms`;
+      perfEl.classList.toggle("bad", fps < 35);
+      perfEl.classList.toggle("warn", fps >= 35 && fps < 52);
     },
     banner(text) {
       if (text === null) {
