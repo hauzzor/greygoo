@@ -55,7 +55,14 @@ $env:Path = "C:\Program Files\nodejs;" + $env:Path
 & "C:\Program Files\nodejs\npm.cmd" install
 & "C:\Program Files\nodejs\npm.cmd" run build     # tsc + vite build
 & "C:\Program Files\nodejs\npm.cmd" run dev -- --port 5173 --strictPort
+& "C:\Program Files\nodejs\npm.cmd" test          # headless simulation regression suite
 ```
+
+The headless suite (`scripts/simtest.ts`, bundled via the esbuild dep and run
+with `node scripts/run-simtests.mjs`) drives the real `World`/`applyGuidance`/
+`updateSignals`/crawl modules in Node and asserts thrust-direction stability,
+the force and speed caps, no signal stacking, and 60 s stability of a large
+looped structure.
 
 Dev server PID is written to `%TEMP%\greygoo-dev.pid`; stop with
 `taskkill /PID (Get-Content "$env:TEMP\greygoo-dev.pid") /T /F`.
@@ -97,7 +104,11 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 - Beams auto-form between blocks only when they are **50–100 apart**
   (`CONNECT_MIN`/`CONNECT_MAX` in `cell.ts`); **stiff springs** (rigidity `0.9`),
   a little wobbly but **non-breaking**. The settings panel is hidden, so the
-  physics params use their defaults (thrust `600`, drag `1.5`).
+  physics params use their defaults (thrust `600`, drag `1.5`). A per-thruster
+  **`MAX_THRUST` cap** (`600`, in `simulation.ts`) clamps the applied force no
+  matter how high the power slider is, and the World enforces a **global speed
+  cap** (`maxSpeed` `500` px/s, `physics.ts`) both during integration and again
+  after the constraint passes, so solver spikes cannot launch a structure.
 - Beams are **solid**: a block cannot pass through a beam it is not attached to.
   `World.solveBeamCollision` treats each beam as a capsule and pushes out any
   node intersecting it (endpoints of the beam are ignored), using a spatial grid.
@@ -112,17 +123,19 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   connections change** (`captureThrustDirection`, hooked to
   `World.onTopologyChange`), then frozen — later live motion does not change it.
   It is stored in `node.dirX/dirY` (used by physics and rendering). A thruster
-  with no neighbours has no direction. When activated it thrusts **full force**
-  along that direction (no goal weighting).
+  with no neighbours has no direction, and one whose neighbours roughly cancel
+  (enclosed/looped, summed length below `THRUST_DIR_MIN` `0.4`) is treated as
+  having **no direction** rather than a noise-driven random one. When activated
+  it thrusts **full force** along that direction (no goal weighting).
 - **Sensor** emits **signal blobs** discretely (not an instant broadcast): every
   second while running, a connected and **emitting** sensor spawns one blob onto
   **each** of its beams. A blob captures the sensor's unit vector to the goal at
   emission (shown as a direction chevron) and moves beam-to-beam as a traveller
   (shortest path to a distance-weighted in-component goal). It **lives until it
   reaches a thruster**, which it fires and then vanishes (if the component has no
-  thruster it roams indefinitely; a soft cap limits total blobs). A hit sets the
-  thruster's `signalTimer` (`+1s`, capped at `3s`, staking on further hits).
-  Pausing clears the blobs.
+  thruster it roams indefinitely; a soft cap limits total blobs). A hit
+  **restarts** the thruster's `signalTimer` to exactly `1s` (extra hits while
+  firing do not stack or extend it). Pausing clears the blobs.
 - **Individual sensor control**: clicking a sensor (select tool, no drag) opens
   a **context menu** next to the block; it lists that block's actions — for a
   sensor, an **Emission: On/Off** toggle that flips its `emitting` flag,
@@ -180,6 +193,8 @@ src/render/particles.ts pooled particle system (world-space, sprite dots, additi
 src/render/renderer.ts cached background, goal, goo-ribbon beams, organic blobs, camera, held preview
 src/ui/hud.ts         DOM wiring for tools/actions/sliders/camera dropdown/stats
 src/ui/contextMenu.ts generic per-block context menu (anchored, outside-click dismiss)
+scripts/simtest.ts    headless sim regression scenarios (thrust, caps, signals, crawl)
+scripts/run-simtests.mjs esbuild-bundles simtest.ts and runs it in Node
 ```
 
 ## How to continue in a new session

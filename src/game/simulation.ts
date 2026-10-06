@@ -1,7 +1,10 @@
 import type { World } from "../core/physics";
 import type { Goal } from "../core/types";
 
+export const MAX_THRUST = 600;
+
 export function applyGuidance(world: World, power: number, dt: number): void {
+  const force = Math.min(power, MAX_THRUST);
   for (const node of world.nodes.values()) {
     node.firing = 0;
     if (node.signalTimer > 0) {
@@ -16,8 +19,8 @@ export function applyGuidance(world: World, power: number, dt: number): void {
     const dirY = thruster.dirY;
     if (dirX === 0 && dirY === 0) continue;
 
-    thruster.accel.x += dirX * power;
-    thruster.accel.y += dirY * power;
+    thruster.accel.x += dirX * force;
+    thruster.accel.y += dirY * force;
     thruster.firing = 1;
   }
 }

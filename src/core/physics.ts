@@ -12,7 +12,7 @@ export interface PhysicsParams {
   damping: number;
   stiffness: number;
   iterations: number;
-  maxVelocity: number;
+  maxSpeed: number;
 }
 
 const EMPTY_BEAMS: Beam[] = [];
@@ -32,7 +32,7 @@ export class World {
     damping: 0.99,
     stiffness: 0.9,
     iterations: 8,
-    maxVelocity: 40,
+    maxSpeed: 500,
   };
 
   private beamsByNode = new Map<number, Beam[]>();
@@ -260,7 +260,8 @@ export class World {
   }
 
   step(dt: number): void {
-    const { damping, maxVelocity } = this.params;
+    const { damping, maxSpeed } = this.params;
+    const maxStep = Math.max(1e-4, maxSpeed * dt);
 
     for (const n of this.nodes.values()) {
       if (n.invMass === 0 || n.ghost) {
@@ -275,8 +276,8 @@ export class World {
       let vy = (n.pos.y - n.prev.y) * damping;
 
       const speed = Math.hypot(vx, vy);
-      if (speed > maxVelocity) {
-        const k = maxVelocity / speed;
+      if (speed > maxStep) {
+        const k = maxStep / speed;
         vx *= k;
         vy *= k;
       }
@@ -293,6 +294,23 @@ export class World {
     this.solveSeparation();
     this.solveBeamCollision();
     this.solveBeamCollision();
+    this.clampVelocities(maxStep);
+  }
+
+  private clampVelocities(maxStep: number): void {
+    const max2 = maxStep * maxStep;
+    for (const n of this.nodes.values()) {
+      if (n.invMass === 0 || n.ghost) continue;
+
+      const dx = n.pos.x - n.prev.x;
+      const dy = n.pos.y - n.prev.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= max2 || d2 === 0) continue;
+
+      const k = maxStep / Math.sqrt(d2);
+      n.pos.x = n.prev.x + dx * k;
+      n.pos.y = n.prev.y + dy * k;
+    }
   }
 
   private solveBeams(): void {

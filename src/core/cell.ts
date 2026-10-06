@@ -5,6 +5,8 @@ import type { Vec2 } from "./vec2";
 export const CONNECT_MIN = 50;
 export const CONNECT_MAX = 100;
 
+export const THRUST_DIR_MIN = 0.4;
+
 export function connectedComponent(world: World, startId: number): Set<number> {
   const seen = new Set<number>([startId]);
   const queue: number[] = [startId];
@@ -197,7 +199,7 @@ export function thrustDirection(world: World, id: number): Vec2 | null {
 
   if (count === 0) return null;
   const len = Math.hypot(x, y);
-  if (len < 1e-6) return null;
+  if (len < THRUST_DIR_MIN) return null;
   return { x: x / len, y: y / len };
 }
 
