@@ -24,7 +24,10 @@ gradient background with dappled light; soft, glowing organic shapes.
 - **Basic Cell** = irregular jelly blob (animated wobbly outline) with gloss and
   velocity-based squash/stretch.
 - Thruster = warm firefly/seed that leaves a soft glowing plume.
-- Sensor = blossom; draws a faint warm "scent trail" to the goal while running.
+- Sensor = blossom in its own identity colour (stable palette per sensor id);
+  draws a faint "scent trail" to the goal while running. Its **signal blobs** are
+  little translucent bubbles in the same colour, each carrying a direction
+  chevron.
 - Camera = pale-blue lens; a highlighted ring marks the camera block the locked
   camera is following.
 - **Beams = goo/glue ribbons**: tapered, bulging where they meet cells, pinched
@@ -102,10 +105,16 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   points toward the (normalized, averaged) connected-neighbour positions. It is
   computed **once per frame** into `node.dirX/dirY` (used by both physics and
   rendering). A thruster with no neighbours produces no thrust.
-- **Sensor** computes the unit vector to the goal and broadcasts it to all
-  thrusters in its connected component. Each thruster fires along its own
-  neighbour-derived direction, weighted by `max(0, dot(dir, goalDir))`
-  (orientation-weighted) times thrust power.
+- **Sensor** emits **signal blobs** discretely (not an instant broadcast): every
+  second while running, a connected sensor spawns one blob onto **each** of its
+  beams. A blob captures the sensor's unit vector to the goal at emission (shown
+  as a direction chevron) and crawls beam-to-beam like an absorbed block (random
+  next beam, never immediately reversing unless forced). On reaching each block
+  it fires that thruster if it is one; after reaching the **second** block it
+  disappears. A hit sets the thruster's `signalTimer` (`+1s`, capped at `3s`,
+  refreshing/staking on further hits). While a thruster's timer is positive it
+  fires along its own neighbour-derived direction, weighted by
+  `max(0, dot(dir, signalGoal))` times thrust power. Pausing clears the blobs.
 - **Run/Pause** button (Space) toggles all abilities (thrusters + sensors)
   globally. Pausing zeroes every block's `firing`.
 - **Camera block**: placing one adds it to a dropdown. A dedicated **Camera**

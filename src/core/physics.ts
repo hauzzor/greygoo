@@ -53,6 +53,9 @@ export class World {
       dirX: 0,
       dirY: 0,
       ghost: false,
+      signalTimer: 0,
+      signalGoalX: 0,
+      signalGoalY: 0,
     };
     this.nodes.set(node.id, node);
     if (!this.beamsByNode.has(node.id)) this.beamsByNode.set(node.id, []);
@@ -160,6 +163,9 @@ export class World {
         dirX: 0,
         dirY: 0,
         ghost: false,
+        signalTimer: 0,
+        signalGoalX: 0,
+        signalGoalY: 0,
       });
     }
     this.beams = snap.beams.map((b) => ({ a: b.a, b: b.b, rest: b.rest }));

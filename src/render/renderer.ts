@@ -3,6 +3,7 @@ import type { World } from "../core/physics";
 import type { Goal, Node } from "../core/types";
 import type { Vec2 } from "../core/vec2";
 import { sprites } from "./sprites";
+import { drawSignals, sensorColor, type SensorColor } from "../game/signals";
 import type { Particles, View } from "./particles";
 
 export interface RenderState {
@@ -21,7 +22,6 @@ const LEAF = "#7fd992";
 const LEAF_MID = "#4aa863";
 const FIREFLY_HOT = "#fff2b8";
 const FIREFLY_DEEP = "#e8a92e";
-const PETAL = "#e6d4ff";
 const PETAL_CORE = "#fff7c2";
 const SUNBEAM = "#ffe9a8";
 const SUNBEAM_RING = "#f7d774";
@@ -165,6 +165,7 @@ export function render(
   drawGoal(ctx, goal, state.time);
   particles.draw(ctx, view);
   drawBeams(ctx, world, state.time, view);
+  drawSignals(ctx, world, state.time, view);
 
   for (const node of world.nodes.values()) {
     if (!nodeVisible(node.pos.x, node.pos.y, node.radius + 26, view)) continue;
@@ -448,7 +449,16 @@ function drawBlock(
     drawCamera(ctx, x, y, radius, cameraActive);
     return;
   }
-  drawSensor(ctx, x, y, radius, running, goal, time);
+  drawSensor(
+    ctx,
+    x,
+    y,
+    radius,
+    running,
+    goal,
+    time,
+    sensorColor(node ? node.id : 0),
+  );
 }
 
 function drawCell(
@@ -617,19 +627,20 @@ function drawSensor(
   running: boolean,
   goal: Goal,
   time: number,
+  color: SensorColor,
 ): void {
   if (running) {
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(goal.pos.x, goal.pos.y);
     ctx.setLineDash([4, 8]);
-    ctx.strokeStyle = "rgba(255, 240, 190, 0.35)";
+    ctx.strokeStyle = hexA(color.hex, 0.4);
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.setLineDash([]);
   }
 
-  drawBlossom(ctx, x, y, radius, time, PETAL, PETAL_CORE);
+  drawBlossom(ctx, x, y, radius, time, color.hex, PETAL_CORE);
 }
 
 function drawCamera(

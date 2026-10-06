@@ -14,6 +14,7 @@ import {
   releaseCrawler,
   updateCrawlers,
 } from "./game/crawl";
+import { clearSignals, updateSignals } from "./game/signals";
 import type { Tool, WorldSnapshot } from "./core/types";
 import { Camera } from "./render/camera";
 import { Particles } from "./render/particles";
@@ -81,6 +82,7 @@ function undo(): void {
   const snap = history.pop();
   if (!snap) return;
   clearCrawlers();
+  clearSignals();
   world.restore(snap);
   selectedId = null;
   dragNodeId = null;
@@ -89,6 +91,7 @@ function undo(): void {
 
 function resetScatter(): void {
   clearCrawlers();
+  clearSignals();
   world.clear();
   particles.clear();
   scatterBlocks(world);
@@ -116,7 +119,11 @@ function toggleRun(): void {
     const c = world.centroid();
     emitRunPoof(particles, c.x, c.y);
   } else {
-    for (const node of world.nodes.values()) node.firing = 0;
+    for (const node of world.nodes.values()) {
+      node.firing = 0;
+      node.signalTimer = 0;
+    }
+    clearSignals();
   }
   hud.banner(null);
 }
@@ -377,7 +384,10 @@ function update(dt: number): void {
 
   updateThrustDirections(world);
 
-  if (running) applyGuidance(world, goal, p.power);
+  if (running) {
+    updateSignals(world, goal, dt);
+    applyGuidance(world, p.power, dt);
+  }
 
   world.step(dt);
   updateCrawlers(world, dt);
