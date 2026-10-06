@@ -176,6 +176,13 @@ registers a **`commit_changes`** tool:
 Auto-commit is local-only and respects `.gitignore`. Disable it for a run with
 `OPENCODE_AUTOCOMMIT=off`. A `/commit <message>` command is also available.
 
+## Reporting
+
+While building, keep reports short and high-level: no lists of changed files
+and no echoed commands. Only give detail when a write targets a path **outside**
+the project directory. See the skill
+`.opencode/skills/terse-build-reporting/SKILL.md`.
+
 ## Build & deploy
 
 After **every successful build** (`npm.cmd run build`), commit any pending
