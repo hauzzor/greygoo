@@ -5,12 +5,12 @@ import {
   previewConnections,
   updateThrustDirections,
 } from "./core/cell";
-import type { BlockType, Ghost, Tool, WorldSnapshot } from "./core/types";
+import type { Tool, WorldSnapshot } from "./core/types";
 import { Camera } from "./render/camera";
 import { Particles } from "./render/particles";
 import { render } from "./render/renderer";
 import { createGoal } from "./game/level";
-import { BLOCK_RADIUS, placeBlock } from "./game/editor";
+import { scatterBlocks } from "./game/editor";
 import { applyGuidance } from "./game/simulation";
 import {
   emitPlacementPop,
@@ -30,7 +30,7 @@ const camera = new Camera();
 const particles = new Particles();
 const goal = createGoal();
 
-let tool: Tool = "cell";
+let tool: Tool = "select";
 let selectedId: number | null = null;
 let running = false;
 
@@ -39,7 +39,7 @@ const panStart = { sx: 0, sy: 0, cx: 0, cy: 0 };
 let dragNodeId: number | null = null;
 let dragStart: WorldSnapshot | null = null;
 let dragMoved = false;
-let ghost: Ghost | null = null;
+let dragDetached = false;
 
 const history: WorldSnapshot[] = [];
 
@@ -59,7 +59,6 @@ const hud = createHud({
 
 function setTool(t: Tool): void {
   tool = t;
-  if (ghost) ghost = null;
   document.body.dataset.tool = t;
   hud.setToolActive(t);
 }
@@ -73,16 +72,24 @@ function undo(): void {
   if (!snap) return;
   world.restore(snap);
   selectedId = null;
-  ghost = null;
+  dragNodeId = null;
   hud.banner(null);
+}
+
+function resetScatter(): void {
+  world.clear();
+  particles.clear();
+  scatterBlocks(world);
+  selectedId = null;
+  dragNodeId = null;
+  dragStart = null;
+  dragMoved = false;
+  dragDetached = false;
 }
 
 function clearAll(): void {
   pushHistory();
-  world.clear();
-  particles.clear();
-  selectedId = null;
-  ghost = null;
+  resetScatter();
   if (running) {
     running = false;
     hud.setRunning(false);
@@ -147,14 +154,8 @@ function syncCameraOptions(): void {
 }
 
 function startNewGame(): void {
-  world.clear();
-  particles.clear();
   history.length = 0;
-  selectedId = null;
-  ghost = null;
-  dragNodeId = null;
-  dragStart = null;
-  dragMoved = false;
+  resetScatter();
   running = false;
   cameraLocked = false;
   selectedCameraId = null;
@@ -162,12 +163,10 @@ function startNewGame(): void {
   hud.setCameraLock(false);
   hud.banner(null);
 
-  const sensor = world.addNode("sensor", { x: 0, y: 0 }, BLOCK_RADIUS.sensor);
-  selectedId = sensor.id;
   camera.x = 0;
   camera.y = 0;
   camera.scale = 1;
-  setTool("cell");
+  setTool("select");
 }
 
 function pickNode(wx: number, wy: number): number | null {
@@ -196,6 +195,7 @@ function selectAndDrag(id: number): void {
   dragNodeId = id;
   dragStart = world.snapshot();
   dragMoved = false;
+  dragDetached = false;
   const n = world.nodes.get(id);
   if (n) n.invMass = 0;
 }
@@ -232,17 +232,7 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
 
-  if (tool === "delete" || tool === "select") {
-    selectedId = null;
-    return;
-  }
-
-  const block = tool as BlockType;
-  ghost = {
-    type: block,
-    pos: { x: w.x, y: w.y },
-    neighbours: previewConnections(world, w, hud.params().connectRadius),
-  };
+  selectedId = null;
 });
 
 canvas.addEventListener("pointermove", (e) => {
@@ -255,19 +245,17 @@ canvas.addEventListener("pointermove", (e) => {
     return;
   }
 
-  if (ghost) {
-    const w = camera.toWorld(sx, sy);
-    ghost.pos.x = w.x;
-    ghost.pos.y = w.y;
-    ghost.neighbours = previewConnections(world, w, hud.params().connectRadius);
-    return;
-  }
-
   if (dragNodeId !== null) {
     const n = world.nodes.get(dragNodeId);
     if (n) {
       const w = camera.toWorld(sx, sy);
-      if (Math.hypot(w.x - n.pos.x, w.y - n.pos.y) > 0.5) dragMoved = true;
+      if (!dragMoved && Math.hypot(w.x - n.pos.x, w.y - n.pos.y) > 2) {
+        dragMoved = true;
+        if (!dragDetached && world.degree(dragNodeId) > 0) {
+          world.detachNode(dragNodeId);
+          dragDetached = true;
+        }
+      }
       n.pos.x = w.x;
       n.pos.y = w.y;
       n.prev.x = w.x;
@@ -281,25 +269,23 @@ function endPointer(): void {
     panning = false;
     return;
   }
-  if (ghost) {
-    const g = ghost;
-    ghost = null;
-    pushHistory();
-    const node = placeBlock(world, g.type, g.pos);
-    autoConnect(world, node.id, hud.params().connectRadius);
-    emitPlacementPop(particles, node.pos.x, node.pos.y);
-    selectedId = node.id;
-    return;
-  }
   if (dragNodeId !== null) {
     const id = dragNodeId;
     const n = world.nodes.get(id);
-    if (n) n.invMass = 1;
-    autoConnect(world, id, hud.params().connectRadius);
+    if (n) {
+      n.invMass = 1;
+      autoConnect(world, id, hud.params().connectRadius);
+      n.prev.x = n.pos.x;
+      n.prev.y = n.pos.y;
+      if (world.degree(id) > 0) {
+        emitPlacementPop(particles, n.pos.x, n.pos.y);
+      }
+    }
     if (dragMoved && dragStart) history.push(dragStart);
     dragNodeId = null;
     dragStart = null;
     dragMoved = false;
+    dragDetached = false;
   }
 }
 
@@ -326,13 +312,9 @@ window.addEventListener("keydown", (e) => {
     toggleRun();
     return;
   }
-  if (e.key === "1") setTool("cell");
-  else if (e.key === "2") setTool("thruster");
-  else if (e.key === "3") setTool("sensor");
-  else if (e.key === "4") setTool("camera");
-  else if (e.key === "5") setTool("pan");
-  else if (e.key === "6") setTool("select");
-  else if (e.key === "7") setTool("delete");
+  if (e.key === "1") setTool("select");
+  else if (e.key === "2") setTool("pan");
+  else if (e.key === "3") setTool("delete");
   else if (e.key === "c" || e.key === "C") toggleCamera();
   else if (e.key === "Delete" || e.key === "Backspace") {
     if (selectedId !== null) {
@@ -341,8 +323,7 @@ window.addEventListener("keydown", (e) => {
       selectedId = null;
     }
   } else if (e.key === "Escape") {
-    if (ghost) ghost = null;
-    else selectedId = null;
+    selectedId = null;
   }
 });
 
@@ -400,6 +381,18 @@ function draw(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
+  let heldNeighbours: number[] = [];
+  if (dragNodeId !== null) {
+    const held = world.nodes.get(dragNodeId);
+    if (held) {
+      heldNeighbours = previewConnections(
+        world,
+        held.pos,
+        hud.params().connectRadius,
+      );
+    }
+  }
+
   render(
     ctx,
     camera,
@@ -412,7 +405,8 @@ function draw(): void {
       time: performance.now() / 1000,
       cameraLocked,
       selectedCameraId,
-      ghost,
+      heldId: dragNodeId,
+      heldNeighbours,
     },
     particles,
   );
@@ -422,7 +416,11 @@ function draw(): void {
   const c = world.centroid();
   const distance =
     world.nodes.size > 0 ? Math.hypot(goal.pos.x - c.x, goal.pos.y - c.y) : null;
-  hud.setStats(world.nodes.size, world.beams.length, distance);
+  let loose = 0;
+  for (const n of world.nodes.values()) {
+    if (world.degree(n.id) === 0) loose++;
+  }
+  hud.setStats(world.nodes.size, world.beams.length, distance, loose);
 
   const now = performance.now();
   if (now - lastPerf > 150) {

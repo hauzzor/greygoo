@@ -1,8 +1,7 @@
 import type { Camera } from "./camera";
 import type { World } from "../core/physics";
-import type { Ghost, Goal, Node } from "../core/types";
+import type { Goal, Node } from "../core/types";
 import type { Vec2 } from "../core/vec2";
-import { BLOCK_RADIUS } from "../game/editor";
 import { sprites } from "./sprites";
 import type { Particles, View } from "./particles";
 
@@ -13,7 +12,8 @@ export interface RenderState {
   time: number;
   cameraLocked: boolean;
   selectedCameraId: number | null;
-  ghost: Ghost | null;
+  heldId: number | null;
+  heldNeighbours: number[];
 }
 
 const LEAF_LIGHT = "#eafbe0";
@@ -209,8 +209,28 @@ export function render(
     }
   }
 
-  if (state.ghost) {
-    drawGhost(ctx, camera, world, state.ghost, state.connectRadius, state.time);
+  if (state.heldId !== null) {
+    const held = world.nodes.get(state.heldId);
+    if (held) {
+      for (const id of state.heldNeighbours) {
+        const other = world.nodes.get(id);
+        if (!other) continue;
+        ctx.beginPath();
+        ctx.moveTo(held.pos.x, held.pos.y);
+        ctx.lineTo(other.pos.x, other.pos.y);
+        ctx.setLineDash([5 / camera.scale, 5 / camera.scale]);
+        ctx.strokeStyle = "rgba(169, 230, 176, 0.85)";
+        ctx.lineWidth = 2.2 / camera.scale;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.beginPath();
+      ctx.arc(held.pos.x, held.pos.y, held.radius + 7, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(233, 255, 235, 0.9)";
+      ctx.lineWidth = 2.5 / camera.scale;
+      ctx.stroke();
+    }
   }
 
   ctx.restore();
@@ -659,77 +679,4 @@ function drawCamera(
   ctx.fill();
 }
 
-function ghostDirection(world: World, ghost: Ghost): Vec2 | null {
-  let x = 0;
-  let y = 0;
-  let count = 0;
 
-  for (const id of ghost.neighbours) {
-    const other = world.nodes.get(id);
-    if (!other) continue;
-    const dx = other.pos.x - ghost.pos.x;
-    const dy = other.pos.y - ghost.pos.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-6) continue;
-    x += dx / len;
-    y += dy / len;
-    count++;
-  }
-
-  if (count === 0) return null;
-  const len = Math.hypot(x, y);
-  if (len < 1e-6) return null;
-  return { x: x / len, y: y / len };
-}
-
-function drawGhost(
-  ctx: CanvasRenderingContext2D,
-  camera: Camera,
-  world: World,
-  ghost: Ghost,
-  connectRadius: number,
-  time: number,
-): void {
-  ctx.save();
-  ctx.globalAlpha = 0.85;
-
-  for (const id of ghost.neighbours) {
-    const other = world.nodes.get(id);
-    if (!other) continue;
-    ctx.beginPath();
-    ctx.moveTo(ghost.pos.x, ghost.pos.y);
-    ctx.lineTo(other.pos.x, other.pos.y);
-    ctx.setLineDash([5 / camera.scale, 5 / camera.scale]);
-    ctx.strokeStyle = "rgba(169, 230, 176, 0.8)";
-    ctx.lineWidth = 2.5 / camera.scale;
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  ctx.beginPath();
-  ctx.arc(ghost.pos.x, ghost.pos.y, connectRadius, 0, Math.PI * 2);
-  ctx.setLineDash([4 / camera.scale, 7 / camera.scale]);
-  ctx.strokeStyle = "rgba(169, 230, 176, 0.3)";
-  ctx.lineWidth = 1.2 / camera.scale;
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.globalAlpha = 0.55;
-  const radius = BLOCK_RADIUS[ghost.type];
-  const dir = ghost.type === "thruster" ? ghostDirection(world, ghost) : null;
-  drawBlock(
-    ctx,
-    ghost.type,
-    ghost.pos.x,
-    ghost.pos.y,
-    radius,
-    dir,
-    0,
-    false,
-    { pos: ghost.pos, radius: 0 },
-    time,
-    null,
-  );
-
-  ctx.restore();
-}

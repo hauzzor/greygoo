@@ -11,19 +11,11 @@
     <header class="hud hud-top">
       <div class="brand">GREY&nbsp;GOO</div>
 
-      <div class="group" id="palette">
-        <span class="group-label">Block</span>
-        <button class="seg tool" data-tool="cell" title="Basic Cell (1)">Basic Cell</button>
-        <button class="seg tool" data-tool="thruster" title="Thruster (2)">Thruster</button>
-        <button class="seg tool" data-tool="sensor" title="Sensor (3)">Sensor</button>
-        <button class="seg tool" data-tool="camera" title="Camera (4)">Camera</button>
-      </div>
-
       <div class="group" id="tools">
         <span class="group-label">Tool</span>
-        <button class="seg tool" data-tool="pan" title="Pan (5)">Pan</button>
-        <button class="seg tool" data-tool="select" title="Select — no block placed (6)">Select</button>
-        <button class="seg tool" data-tool="delete" title="Delete — click a block to remove it (7)">Delete</button>
+        <button class="seg tool" data-tool="select" title="Drag — pick up & move a block (1)">Drag</button>
+        <button class="seg tool" data-tool="pan" title="Pan (2)">Pan</button>
+        <button class="seg tool" data-tool="delete" title="Delete — click a block to remove it (3)">Delete</button>
       </div>
 
       <div class="group">
@@ -62,12 +54,13 @@
       <div class="stats">
         <div><span>Nodes</span><b id="stat-nodes">0</b></div>
         <div><span>Beams</span><b id="stat-beams">0</b></div>
+        <div><span>Loose</span><b id="stat-loose">0</b></div>
         <div><span>Distance</span><b id="stat-dist">–</b></div>
       </div>
     </aside>
 
     <footer class="hud hud-bottom">
-      <div id="hint">Click &amp; release to place · drag a block to move · <b>6</b> Select · <b>7</b> Delete · right-drag to pan · wheel to zoom</div>
+      <div id="hint">Drag a loose block to build · drop it near others to connect · right-drag to pan · wheel to zoom</div>
     </footer>
 
     <div id="banner" class="banner hidden"><span id="banner-text">GOAL REACHED</span></div>

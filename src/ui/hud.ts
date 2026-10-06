@@ -25,7 +25,12 @@ export interface Hud {
   setRunning: (running: boolean) => void;
   setCameraLock: (locked: boolean) => void;
   setCameraOptions: (options: CameraOption[], selectedId: number | null) => void;
-  setStats: (nodes: number, beams: number, distance: number | null) => void;
+  setStats: (
+    nodes: number,
+    beams: number,
+    distance: number | null,
+    loose: number,
+  ) => void;
   setPerf: (fps: number, ups: number, ms: number) => void;
   banner: (text: string | null) => void;
   setToolActive: (tool: Tool) => void;
@@ -62,10 +67,11 @@ export function createHud(handlers: HudHandlers): Hud {
 
   const statNodes = el<HTMLElement>("stat-nodes");
   const statBeams = el<HTMLElement>("stat-beams");
+  const statLoose = el<HTMLElement>("stat-loose");
   const statDist = el<HTMLElement>("stat-dist");
   const perfEl = el<HTMLDivElement>("perf");
 
-  let activeTool: Tool = "cell";
+  let activeTool: Tool = "select";
   let optionsKey = "";
 
   const syncLabel = (): void => {
@@ -130,9 +136,10 @@ export function createHud(handlers: HudHandlers): Hud {
       cameraSelect.disabled = options.length === 0;
       cameraBtn.disabled = options.length === 0;
     },
-    setStats(nodes, beams, distance) {
+    setStats(nodes, beams, distance, loose) {
       statNodes.textContent = String(nodes);
       statBeams.textContent = String(beams);
+      statLoose.textContent = String(loose);
       statDist.textContent = distance === null ? "–" : `${Math.round(distance)} px`;
     },
     setPerf(fps, ups, ms) {
@@ -164,6 +171,6 @@ export function createHud(handlers: HudHandlers): Hud {
     }),
   };
 
-  hud.setToolActive("cell");
+  hud.setToolActive("select");
   return hud;
 }

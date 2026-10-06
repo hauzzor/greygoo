@@ -101,6 +101,12 @@ export class World {
     else this.beamsByNode.delete(id);
   }
 
+  detachNode(id: number): void {
+    const before = this.beams.length;
+    this.beams = this.beams.filter((b) => b.a !== id && b.b !== id);
+    if (this.beams.length !== before) this.reindex();
+  }
+
   clear(): void {
     this.nodes.clear();
     this.beams = [];

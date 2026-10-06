@@ -2,10 +2,12 @@
 
 Project folder: `C:\Users\phili\Desktop\vs code workspace\greygoo`
 
-World of Goo–inspired browser game: build a biological cell out of blocks
-directly in a single, always-running zero-g environment. A Run/Pause button
-activates the blocks' abilities (thrusters, sensors) so the cell navigates
-toward a goal.
+World of Goo–inspired browser game in a single, always-running zero-g
+environment. Building blocks are **lying scattered across the map** — there is
+no build-from-nothing. Pick a block up with the mouse and drag it into a
+structure; dropping it within the connect radius of another block links it,
+otherwise it is simply dropped loose. A Run/Pause button activates the blocks'
+abilities (thrusters, sensors) so the cell navigates toward a goal.
 
 ## Stack
 
@@ -62,8 +64,16 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 
 - 2D, top-down, zero-g petri dish with fluid drag (no gravity).
 - Blocks: **Basic Cell** (`cell`), **Thruster**, **Sensor**, **Camera**.
-- **Single environment — no editor/sim split.** Blocks are placed directly into
-  the running world; physics (fluid damping) runs at all times.
+- **Single environment — no editor/sim split.** Physics (fluid damping) runs at
+  all times.
+- **No spawning.** A fixed pool of blocks is scattered around the origin at game
+  start (`scatterBlocks`); the supply is finite.
+- **Pick up / drag / connect.** Left-drag a block to pick it up. On release, if
+  it is within the connect radius of another block it connects (beams form);
+  otherwise it is dropped loose and at rest. Dragging a connected block
+  **detaches** it (its beams are removed) — a plain click selects without
+  detaching. Loose blocks are dynamic at rest and can be nudged by a moving
+  structure.
 - Beams auto-form between blocks within the connect radius (slider, default
   `90`, max `320`); **stiff springs** (Advanced "Beam rigidity", default `0.9`),
   a little wobbly but **non-breaking**.
@@ -92,16 +102,17 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 
 ## Controls
 
-- Blocks / keys `1` Basic Cell, `2` Thruster, `3` Sensor, `4` Camera.
-- Tools / keys `5` Pan, `6` Select (no-spawn), `7` Delete.
-- Left-click on empty space (with a block tool) starts **ghost placement**: a
-  translucent preview with the connections it would form; release to commit,
-  `Escape` to cancel. **Select** places nothing; **Delete** removes the clicked
-  block (single click per block). `Delete` / `Backspace` removes the selected
-  block.
-- Drag an existing block to move it (re-runs auto-connect on release).
+- Tools / keys `1` Drag (pick up & move), `2` Pan, `3` Delete.
+- Left-drag a block to pick it up; prospective connections show as dashed lines.
+  Release within the connect radius of another block to link it, or drop it
+  loose. Dragging a connected block detaches it from the structure.
+- **Delete** removes the clicked block (single click per block); `Delete` /
+  `Backspace` removes the selected block.
 - Right / middle mouse drag, or Pan tool + left drag, to pan. Wheel to zoom.
 - `Space` toggles Run/Pause; `C` toggles camera lock; `Ctrl+Z` undoes.
+- **Clear** resets the scene to the initial scattered supply.
+- **New game** scatters the balanced set: ~14 Basic Cells, 5 Thrusters,
+  3 Sensors, 1 Camera.
 
 ## File map
 
@@ -110,17 +121,17 @@ index.html            HUD markup (blocks, tools, actions, advanced sliders, stat
 src/main.ts           bootstrap, fixed 1/60 loop, tools, undo history, camera lock, input
 src/style.css         frosted light-green HUD styling
 src/core/vec2.ts      vector helpers
-src/core/types.ts     BlockType, Node, Beam, Ghost, Goal, Tool, WorldSnapshot
+src/core/types.ts     BlockType, Node, Beam, Goal, Tool, WorldSnapshot
 src/core/physics.ts   World: Verlet+stiff constraints, adjacency index, spatial-hash separation, snapshot/restore
 src/core/cell.ts      adjacency BFS/autoConnect/preview, thrustDirection + updateThrustDirections
 src/game/level.ts     goal definition
-src/game/editor.ts    BLOCK_RADIUS, placeBlock
+src/game/editor.ts    BLOCK_RADIUS, scatterBlocks (starting supply)
 src/game/simulation.ts applyGuidance (sensor->thrusters); checkWin kept for future win logic
 src/game/effects.ts   ambient life, thruster exhaust, placement/run/win FX
 src/render/camera.ts  pan/zoom, world<->screen, follow, "kick" punch
 src/render/sprites.ts offscreen sprite/tile cache (glow, background, particle dots)
 src/render/particles.ts pooled particle system (world-space, sprite dots, additive glow)
-src/render/renderer.ts cached background, goal, goo-ribbon beams, organic blobs, camera, ghost
+src/render/renderer.ts cached background, goal, goo-ribbon beams, organic blobs, camera, held preview
 src/ui/hud.ts         DOM wiring for tools/actions/sliders/camera dropdown/stats
 ```
 

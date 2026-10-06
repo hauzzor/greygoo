@@ -15,12 +15,6 @@ export interface Node {
   dirY: number;
 }
 
-export interface Ghost {
-  type: BlockType;
-  pos: Vec2;
-  neighbours: number[];
-}
-
 export interface Beam {
   a: number;
   b: number;
@@ -52,4 +46,4 @@ export interface WorldSnapshot {
   nextId: number;
 }
 
-export type Tool = BlockType | "pan" | "select" | "delete";
+export type Tool = "select" | "pan" | "delete";
