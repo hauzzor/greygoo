@@ -15,6 +15,13 @@ export class Camera {
     };
   }
 
+  toScreen(wx: number, wy: number): Vec2 {
+    return {
+      x: (wx - this.x) * this.scale + this.width / 2,
+      y: (wy - this.y) * this.scale + this.height / 2,
+    };
+  }
+
   zoomAt(sx: number, sy: number, factor: number): void {
     const before = this.toWorld(sx, sy);
     this.scale = Math.max(0.2, Math.min(4, this.scale * factor));

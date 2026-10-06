@@ -16,8 +16,6 @@ export interface HudHandlers {
   onToggleRun: () => void;
   onToggleCamera: () => void;
   onSelectCamera: (id: number) => void;
-  onSelectSensor: (id: number) => void;
-  onToggleSensor: () => void;
   onUndo: () => void;
   onClear: () => void;
 }
@@ -26,8 +24,6 @@ export interface Hud {
   setRunning: (running: boolean) => void;
   setCameraLock: (locked: boolean) => void;
   setCameraOptions: (options: CameraOption[], selectedId: number | null) => void;
-  setSensorOptions: (options: CameraOption[], selectedId: number | null) => void;
-  setSensorEmitting: (on: boolean) => void;
   setStats: (
     nodes: number,
     beams: number,
@@ -56,8 +52,6 @@ export function createHud(handlers: HudHandlers): Hud {
   const runBtn = el<HTMLButtonElement>("run");
   const cameraBtn = el<HTMLButtonElement>("camera-toggle");
   const cameraSelect = el<HTMLSelectElement>("camera-select");
-  const sensorBtn = el<HTMLButtonElement>("sensor-toggle");
-  const sensorSelect = el<HTMLSelectElement>("sensor-select");
   const undoBtn = el<HTMLButtonElement>("undo");
   const clearBtn = el<HTMLButtonElement>("clear");
 
@@ -76,8 +70,6 @@ export function createHud(handlers: HudHandlers): Hud {
 
   let activeTool: Tool = "select";
   let optionsKey = "";
-  let sensorKey = "";
-  let sensorEmitState: boolean | null = null;
 
   const syncLabel = (): void => {
     powerVal.textContent = power.value;
@@ -104,11 +96,6 @@ export function createHud(handlers: HudHandlers): Hud {
   cameraSelect.addEventListener("change", () => {
     if (cameraSelect.value === "") return;
     handlers.onSelectCamera(Number(cameraSelect.value));
-  });
-  sensorBtn.addEventListener("click", handlers.onToggleSensor);
-  sensorSelect.addEventListener("change", () => {
-    if (sensorSelect.value === "") return;
-    handlers.onSelectSensor(Number(sensorSelect.value));
   });
 
   const hud: Hud = {
@@ -143,35 +130,6 @@ export function createHud(handlers: HudHandlers): Hud {
       cameraSelect.value = selectedId === null ? "" : String(selectedId);
       cameraSelect.disabled = options.length === 0;
       cameraBtn.disabled = options.length === 0;
-    },
-    setSensorOptions(options, selectedId) {
-      const key = options.map((o) => o.id).join(",");
-      if (key !== sensorKey) {
-        sensorKey = key;
-        sensorSelect.innerHTML = "";
-        if (options.length === 0) {
-          const empty = document.createElement("option");
-          empty.value = "";
-          empty.textContent = "No sensor";
-          sensorSelect.appendChild(empty);
-        } else {
-          for (const option of options) {
-            const opt = document.createElement("option");
-            opt.value = String(option.id);
-            opt.textContent = option.label;
-            sensorSelect.appendChild(opt);
-          }
-        }
-      }
-      sensorSelect.value = selectedId === null ? "" : String(selectedId);
-      sensorSelect.disabled = options.length === 0;
-      sensorBtn.disabled = options.length === 0;
-    },
-    setSensorEmitting(on) {
-      if (on === sensorEmitState) return;
-      sensorEmitState = on;
-      sensorBtn.textContent = on ? "Emit: On" : "Emit: Off";
-      sensorBtn.classList.toggle("on", on);
     },
     setStats(nodes, beams, distance, loose) {
       statNodes.textContent = String(nodes);

@@ -298,6 +298,72 @@ input[type="range"] {
   border-color: rgba(217, 83, 79, 0.55);
 }
 
+.context-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 148px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(14, 42, 28, 0.28);
+  animation: context-in 0.12s ease-out both;
+}
+
+.context-menu.hidden {
+  display: none;
+}
+
+.context-menu-title {
+  padding: 5px 8px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 3px;
+}
+
+.context-menu-item {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--border);
+}
+
+.context-menu-item.on {
+  background: var(--accent-dim);
+  border-color: rgba(79, 157, 98, 0.5);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@keyframes context-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .banner {
   position: fixed;
   top: 50%;
@@ -337,7 +403,8 @@ input[type="range"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .banner:not(.hidden) {
+  .banner:not(.hidden),
+  .context-menu {
     animation: none;
   }
 

@@ -30,6 +30,7 @@ import {
   updateAmbientLife,
 } from "./game/effects";
 import { createHud } from "./ui/hud";
+import { createContextMenu, type MenuModel } from "./ui/contextMenu";
 
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
 const context = canvas.getContext("2d");
@@ -60,7 +61,10 @@ const history: WorldSnapshot[] = [];
 
 let cameraLocked = false;
 let selectedCameraId: number | null = null;
-let selectedSensorId: number | null = null;
+
+const contextMenu = createContextMenu();
+let menuNodeId: number | null = null;
+let suppressMenuReopen = false;
 
 const hud = createHud({
   onTool: (t) => setTool(t),
@@ -69,14 +73,63 @@ const hud = createHud({
   onSelectCamera: (id) => {
     selectedCameraId = id;
   },
-  onSelectSensor: (id) => {
-    selectedSensorId = id;
-    syncSensorOptions();
-  },
-  onToggleSensor: () => toggleSensor(),
   onUndo: () => undo(),
   onClear: () => clearAll(),
 });
+
+function buildBlockMenu(id: number): MenuModel | null {
+  const n = world.nodes.get(id);
+  if (!n) return null;
+  if (n.type === "sensor") {
+    return {
+      title: `Sensor #${n.id}`,
+      actions: [
+        {
+          label: n.emitting ? "Emission: On" : "Emission: Off",
+          on: n.emitting,
+          onSelect: () => {
+            const sensor = world.nodes.get(id);
+            if (sensor) sensor.emitting = !sensor.emitting;
+          },
+        },
+      ],
+    };
+  }
+  return null;
+}
+
+function openBlockMenu(id: number): void {
+  const n = world.nodes.get(id);
+  if (!n) return;
+  const model = buildBlockMenu(id);
+  if (!model) return;
+  menuNodeId = id;
+  const s = camera.toScreen(n.pos.x, n.pos.y);
+  contextMenu.open(s.x, s.y, n.radius * camera.scale, () =>
+    buildBlockMenu(id),
+  );
+}
+
+function closeBlockMenu(): void {
+  contextMenu.close();
+  menuNodeId = null;
+}
+
+window.addEventListener(
+  "pointerdown",
+  (e) => {
+    suppressMenuReopen = false;
+    if (menuNodeId === null) return;
+    if (contextMenu.contains(e.target)) return;
+    const anchor = menuNodeId;
+    closeBlockMenu();
+    if (e.button === 0 && e.target === canvas) {
+      const w = camera.toWorld(e.clientX, e.clientY);
+      if (pickNode(w.x, w.y) === anchor) suppressMenuReopen = true;
+    }
+  },
+  true,
+);
 
 function setTool(t: Tool): void {
   tool = t;
@@ -97,6 +150,7 @@ function undo(): void {
   syncThrustDirections(world);
   selectedId = null;
   dragNodeId = null;
+  closeBlockMenu();
   hud.banner(null);
 }
 
@@ -112,6 +166,7 @@ function resetScatter(): void {
   dragStart = null;
   dragMoved = false;
   dragDetached = false;
+  closeBlockMenu();
 }
 
 function clearAll(): void {
@@ -184,54 +239,13 @@ function syncCameraOptions(): void {
   hud.setCameraOptions(options, selectedCameraId);
 }
 
-function firstSensorId(): number | null {
-  for (const node of world.nodes.values()) {
-    if (node.type === "sensor") return node.id;
-  }
-  return null;
-}
-
-function toggleSensor(): void {
-  if (selectedSensorId === null || !world.nodes.has(selectedSensorId)) {
-    const first = firstSensorId();
-    if (first === null) return;
-    selectedSensorId = first;
-  }
-  const node = world.nodes.get(selectedSensorId);
-  if (!node || node.type !== "sensor") return;
-  node.emitting = !node.emitting;
-  syncSensorOptions();
-}
-
-function syncSensorOptions(): void {
-  const options: { id: number; label: string }[] = [];
-  for (const node of world.nodes.values()) {
-    if (node.type === "sensor") {
-      options.push({ id: node.id, label: `Sensor #${node.id}` });
-    }
-  }
-  if (
-    selectedSensorId !== null &&
-    !options.some((o) => o.id === selectedSensorId)
-  ) {
-    selectedSensorId = options.length > 0 ? options[0].id : null;
-  }
-  if (selectedSensorId === null && options.length > 0) {
-    selectedSensorId = options[0].id;
-  }
-  hud.setSensorOptions(options, selectedSensorId);
-  const sel =
-    selectedSensorId === null ? null : world.nodes.get(selectedSensorId);
-  hud.setSensorEmitting(sel ? sel.emitting : false);
-}
-
 function startNewGame(): void {
   history.length = 0;
   resetScatter();
   running = false;
   cameraLocked = false;
   selectedCameraId = null;
-  selectedSensorId = null;
+  closeBlockMenu();
   hud.setRunning(false);
   hud.setCameraLock(false);
   hud.banner(null);
@@ -301,6 +315,7 @@ canvas.addEventListener("pointerdown", (e) => {
   if (hit !== null) {
     if (tool === "delete") {
       pushHistory();
+      if (menuNodeId === hit) closeBlockMenu();
       world.removeNode(hit);
       if (selectedId === hit) selectedId = null;
       return;
@@ -341,7 +356,7 @@ canvas.addEventListener("pointermove", (e) => {
   }
 });
 
-function endPointer(): void {
+function endPointer(e: PointerEvent): void {
   if (panning) {
     panning = false;
     return;
@@ -361,11 +376,14 @@ function endPointer(): void {
       }
     }
     if (dragMoved && dragStart) history.push(dragStart);
+    const clicked = !dragMoved && e.type === "pointerup";
     dragNodeId = null;
     dragStart = null;
     dragMoved = false;
     dragDetached = false;
+    if (clicked && !suppressMenuReopen) openBlockMenu(id);
   }
+  suppressMenuReopen = false;
 }
 
 canvas.addEventListener("pointerup", endPointer);
@@ -398,11 +416,13 @@ window.addEventListener("keydown", (e) => {
   else if (e.key === "Delete" || e.key === "Backspace") {
     if (selectedId !== null) {
       pushHistory();
+      if (menuNodeId === selectedId) closeBlockMenu();
       world.removeNode(selectedId);
       selectedId = null;
     }
   } else if (e.key === "Escape") {
     selectedId = null;
+    closeBlockMenu();
   }
 });
 
@@ -489,7 +509,16 @@ function draw(): void {
   );
 
   syncCameraOptions();
-  syncSensorOptions();
+
+  if (menuNodeId !== null) {
+    const n = world.nodes.get(menuNodeId);
+    if (n) {
+      const s = camera.toScreen(n.pos.x, n.pos.y);
+      contextMenu.anchor(s.x, s.y, n.radius * camera.scale);
+    } else {
+      closeBlockMenu();
+    }
+  }
 
   const c = world.centroid();
   const distance =

@@ -123,9 +123,12 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   thruster it roams indefinitely; a soft cap limits total blobs). A hit sets the
   thruster's `signalTimer` (`+1s`, capped at `3s`, staking on further hits).
   Pausing clears the blobs.
-- **Individual sensor control**: a dropdown lists sensors and an **Emit**
-  button toggles the selected sensor's `emitting` flag, pausing/resuming its
-  signal emission without affecting other sensors.
+- **Individual sensor control**: clicking a sensor (select tool, no drag) opens
+  a **context menu** next to the block; it lists that block's actions — for a
+  sensor, an **Emission: On/Off** toggle that flips its `emitting` flag,
+  pausing/resuming its signal emission without affecting other sensors. The menu
+  is generic (per-block actions) and closes when clicking anywhere outside it.
+  Clicking the same block again toggles the menu closed.
 - **Run/Pause** button (Space) toggles all abilities (thrusters + sensors)
   globally. Pausing zeroes every block's `firing`.
 - **Camera block**: placing one adds it to a dropdown. A dedicated **Camera**
@@ -146,6 +149,8 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   loose. Dragging a connected block detaches it from the structure.
 - **Delete** removes the clicked block (single click per block); `Delete` /
   `Backspace` removes the selected block.
+- Click a block (select tool, no drag) to open its context menu next to it;
+  click outside the menu to dismiss it.
 - Right / middle mouse drag, or Pan tool + left drag, to pan. Wheel to zoom.
 - `Space` toggles Run/Pause; `C` toggles camera lock; `Ctrl+Z` undoes.
 - **Clear** resets the scene to the initial scattered supply.
@@ -174,6 +179,7 @@ src/render/sprites.ts offscreen sprite/tile cache (glow, background, particle do
 src/render/particles.ts pooled particle system (world-space, sprite dots, additive glow)
 src/render/renderer.ts cached background, goal, goo-ribbon beams, organic blobs, camera, held preview
 src/ui/hud.ts         DOM wiring for tools/actions/sliders/camera dropdown/stats
+src/ui/contextMenu.ts generic per-block context menu (anchored, outside-click dismiss)
 ```
 
 ## How to continue in a new session
