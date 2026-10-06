@@ -81,13 +81,18 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   it skip integration, separation, and beam collision, so it never pushes other
   blocks and can be dragged directly over them. It is rendered translucent while
   held.
+- **Travellers:** every entity that moves along the structure — absorbed blocks
+  (crawlers) and signal blobs. Each traveller picks a **random block in its own
+  connected component** as a movement goal and travels there by the **shortest
+  path** (BFS over beams, `nextStepToward`). On arriving it picks a new random
+  goal; if its goal is removed (or becomes unreachable) it immediately picks
+  another. See `src/game/travellers.ts`.
 - **Absorb & crawl (World-of-Goo style):** a loose block that collides with the
   structure (a beam or a structure block) is absorbed and then travels
-  block-to-block **along the beams** as a kinematic, non-colliding crawler. At
-  each node it picks a random beam, never immediately reversing onto the one it
-  came from unless that is the only option. The player can still grab a crawling
-  block and place it. See `src/game/crawl.ts` (hooks `World.onAbsorb` /
-  `onAbsorbNode`).
+  block-to-block **along the beams** as a kinematic, non-colliding traveller
+  (crawler), following the shortest path to its current goal. The player can
+  still grab a crawling block and place it. See `src/game/crawl.ts` (hooks
+  `World.onAbsorb` / `onAbsorbNode`).
 - Beams auto-form between blocks only when they are **50–100 apart**
   (`CONNECT_MIN`/`CONNECT_MAX` in `cell.ts`); **stiff springs** (rigidity `0.9`),
   a little wobbly but **non-breaking**. The settings panel is hidden, so the
@@ -108,10 +113,9 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
 - **Sensor** emits **signal blobs** discretely (not an instant broadcast): every
   second while running, a connected sensor spawns one blob onto **each** of its
   beams. A blob captures the sensor's unit vector to the goal at emission (shown
-  as a direction chevron) and crawls beam-to-beam like an absorbed block (random
-  next beam, never immediately reversing unless forced). On reaching each block
-  it fires that thruster if it is one; after reaching the **second** block it
-  disappears. A hit sets the thruster's `signalTimer` (`+1s`, capped at `3s`,
+  as a direction chevron) and moves beam-to-beam as a traveller (shortest path to
+  a random in-component goal). On reaching each block it fires that thruster if
+  it is one; after reaching the **second** block it disappears. A hit sets the thruster's `signalTimer` (`+1s`, capped at `3s`,
   refreshing/staking on further hits). While a thruster's timer is positive it
   fires along its own neighbour-derived direction, weighted by
   `max(0, dot(dir, signalGoal))` times thrust power. Pausing clears the blobs.
@@ -153,9 +157,11 @@ src/core/physics.ts   World: Verlet+stiff constraints, adjacency index, spatial-
 src/core/cell.ts      adjacency BFS/autoConnect/preview, thrustDirection + updateThrustDirections
 src/game/level.ts     goal definition
 src/game/editor.ts    BLOCK_RADIUS, scatterBlocks (starting supply)
-src/game/simulation.ts applyGuidance (sensor->thrusters); checkWin kept for future win logic
+src/game/simulation.ts applyGuidance (signal-driven thruster firing); checkWin kept for future win logic
 src/game/effects.ts   ambient life, thruster exhaust, placement/run/win FX
-src/game/crawl.ts     absorb-on-contact + random-walk crawlers along beams
+src/game/travellers.ts shared shortest-path movement for travellers (blocks/blobs)
+src/game/crawl.ts     absorb-on-contact + traveller crawlers along beams
+src/game/signals.ts   sensor signal-blob emission, travel + drawing
 src/render/camera.ts  pan/zoom, world<->screen, follow, "kick" punch
 src/render/sprites.ts offscreen sprite/tile cache (glow, background, particle dots)
 src/render/particles.ts pooled particle system (world-space, sprite dots, additive glow)

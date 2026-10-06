@@ -1,13 +1,11 @@
 import type { World } from "../core/physics";
 import type { Beam } from "../core/types";
+import { pickGoal, stepTraveller, type Traveller } from "./travellers";
 
 export const CRAWL_SPEED = 60;
 
-interface Crawler {
+interface Crawler extends Traveller {
   nodeId: number;
-  atId: number;
-  toId: number;
-  t: number;
 }
 
 const crawlers = new Map<number, Crawler>();
@@ -49,7 +47,13 @@ function startOnBeam(world: World, nodeId: number, beam: Beam, t: number): void 
 
   node.ghost = true;
   node.invMass = 0;
-  crawlers.set(nodeId, { nodeId, atId, toId, t: tt });
+  crawlers.set(nodeId, {
+    nodeId,
+    atId,
+    toId,
+    t: tt,
+    goalId: pickGoal(world, toId) ?? atId,
+  });
   snapTo(world, nodeId, atId, toId, tt);
 }
 
@@ -64,7 +68,13 @@ function startOnNode(world: World, nodeId: number, structId: number): void {
 
   node.ghost = true;
   node.invMass = 0;
-  crawlers.set(nodeId, { nodeId, atId: structId, toId, t: 0 });
+  crawlers.set(nodeId, {
+    nodeId,
+    atId: structId,
+    toId,
+    t: 0,
+    goalId: pickGoal(world, structId) ?? toId,
+  });
   snapTo(world, nodeId, structId, toId, 0);
 }
 
@@ -107,26 +117,22 @@ export function updateCrawlers(world: World, dt: number): void {
     let guard = 0;
     while (crawler.t >= 1 && guard < 8) {
       guard++;
-      const arrived = crawler.toId;
-      const cameFrom = crawler.atId;
-
-      const options: number[] = [];
-      for (const beam of world.neighbors(arrived)) {
-        const other = otherEnd(beam, arrived);
-        if (other !== cameFrom && world.nodes.has(other)) options.push(other);
-      }
-      const next =
-        options.length > 0
-          ? options[Math.floor(Math.random() * options.length)]
-          : cameFrom;
-
-      crawler.atId = arrived;
-      crawler.toId = next;
+      crawler.atId = crawler.toId;
       crawler.t -= 1;
 
       at = world.nodes.get(crawler.atId);
+      if (!at) {
+        releaseCrawler(world, crawler.nodeId);
+        break;
+      }
+
+      if (!stepTraveller(world, crawler)) {
+        releaseCrawler(world, crawler.nodeId);
+        break;
+      }
+
       to = world.nodes.get(crawler.toId);
-      if (!at || !to) {
+      if (!to) {
         releaseCrawler(world, crawler.nodeId);
         break;
       }

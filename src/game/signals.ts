@@ -2,6 +2,7 @@ import type { World } from "../core/physics";
 import type { Beam, Goal, Node } from "../core/types";
 import type { View } from "../render/particles";
 import { sprites } from "../render/sprites";
+import { pickGoal, stepTraveller, type Traveller } from "./travellers";
 
 export const SIGNAL_SPEED = 110;
 export const EMIT_INTERVAL = 1;
@@ -33,14 +34,11 @@ export function sensorColor(id: number): SensorColor {
   return SENSOR_PALETTE[sensorColorIndex(id)];
 }
 
-interface Signal {
+interface Signal extends Traveller {
   sensorId: number;
   color: number;
   dirX: number;
   dirY: number;
-  atId: number;
-  toId: number;
-  t: number;
   hops: number;
   phase: number;
 }
@@ -62,6 +60,7 @@ function spawn(world: World, sensor: Node, otherId: number, gx: number, gy: numb
     atId: sensor.id,
     toId: otherId,
     t: 0,
+    goalId: pickGoal(world, sensor.id) ?? otherId,
     hops: 0,
     phase: Math.random() * Math.PI * 2,
   });
@@ -119,10 +118,8 @@ export function updateSignals(world: World, goal: Goal, dt: number): void {
     while (sig.t >= 1 && guard < 8) {
       guard++;
       sig.t -= 1;
-      const arrived = sig.toId;
-      const cameFrom = sig.atId;
 
-      const node = world.nodes.get(arrived);
+      const node = world.nodes.get(sig.toId);
       if (node && node.type === "thruster") fireThruster(node, sig.dirX, sig.dirY);
 
       sig.hops++;
@@ -131,21 +128,20 @@ export function updateSignals(world: World, goal: Goal, dt: number): void {
         break;
       }
 
-      const options: number[] = [];
-      for (const beam of world.neighbors(arrived)) {
-        const other = otherEnd(beam, arrived);
-        if (other !== cameFrom && world.nodes.has(other)) options.push(other);
-      }
-      const next =
-        options.length > 0
-          ? options[Math.floor(Math.random() * options.length)]
-          : cameFrom;
-
-      sig.atId = arrived;
-      sig.toId = next;
+      sig.atId = sig.toId;
       at = world.nodes.get(sig.atId);
+      if (!at) {
+        dead = true;
+        break;
+      }
+
+      if (!stepTraveller(world, sig)) {
+        dead = true;
+        break;
+      }
+
       to = world.nodes.get(sig.toId);
-      if (!at || !to) {
+      if (!to) {
         dead = true;
         break;
       }
