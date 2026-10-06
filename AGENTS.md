@@ -146,6 +146,13 @@ registers a **`commit_changes`** tool:
 Auto-commit is local-only and respects `.gitignore`. Disable it for a run with
 `OPENCODE_AUTOCOMMIT=off`. A `/commit <message>` command is also available.
 
+## Build & deploy
+
+After **every successful build** (`npm.cmd run build`), commit any pending
+changes (`commit_changes`), push to `origin/main`, and verify the Pages deploy.
+See the skill `.opencode/skills/deploy-after-build/SKILL.md` for the full
+workflow. A build is not done until it is pushed and the live site is verified.
+
 ## Deploy (GitHub Pages)
 
 Remote: `https://github.com/hauzzor/greygoo.git`, branch `main`. Pushing to
