@@ -201,20 +201,19 @@ export function thrustDirection(world: World, id: number): Vec2 | null {
   return { x: x / len, y: y / len };
 }
 
-export function updateThrustDirections(world: World): void {
-  for (const node of world.nodes.values()) {
-    if (node.type !== "thruster") {
-      node.dirX = 0;
-      node.dirY = 0;
-      continue;
-    }
-    const dir = thrustDirection(world, node.id);
-    if (dir) {
-      node.dirX = dir.x;
-      node.dirY = dir.y;
-    } else {
-      node.dirX = 0;
-      node.dirY = 0;
-    }
+export function captureThrustDirection(world: World, id: number): void {
+  const node = world.nodes.get(id);
+  if (!node || node.type !== "thruster") return;
+  const dir = thrustDirection(world, id);
+  if (dir) {
+    node.dirX = dir.x;
+    node.dirY = dir.y;
+  } else {
+    node.dirX = 0;
+    node.dirY = 0;
   }
+}
+
+export function syncThrustDirections(world: World): void {
+  for (const node of world.nodes.values()) captureThrustDirection(world, node.id);
 }

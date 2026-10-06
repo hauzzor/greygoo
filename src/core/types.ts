@@ -14,9 +14,8 @@ export interface Node {
   dirX: number;
   dirY: number;
   ghost: boolean;
+  emitting: boolean;
   signalTimer: number;
-  signalGoalX: number;
-  signalGoalY: number;
 }
 
 export interface Beam {

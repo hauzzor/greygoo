@@ -6,10 +6,10 @@ import { pickGoal, stepTraveller, type Traveller } from "./travellers";
 
 export const SIGNAL_SPEED = 110;
 export const EMIT_INTERVAL = 1;
-export const SIGNAL_HOP_LIMIT = 2;
 export const SIGNAL_FIRE_TIME = 1;
 export const SIGNAL_FIRE_CAP = 3;
 const SIGNAL_RADIUS = 6;
+const MAX_SIGNALS = 500;
 
 export interface SensorColor {
   hex: string;
@@ -39,7 +39,6 @@ interface Signal extends Traveller {
   color: number;
   dirX: number;
   dirY: number;
-  hops: number;
   phase: number;
 }
 
@@ -52,6 +51,7 @@ function otherEnd(beam: Beam, id: number): number {
 
 function spawn(world: World, sensor: Node, otherId: number, gx: number, gy: number): void {
   if (!world.nodes.has(otherId)) return;
+  if (signals.length >= MAX_SIGNALS) return;
   signals.push({
     sensorId: sensor.id,
     color: sensorColorIndex(sensor.id),
@@ -61,15 +61,12 @@ function spawn(world: World, sensor: Node, otherId: number, gx: number, gy: numb
     toId: otherId,
     t: 0,
     goalId: pickGoal(world, sensor.id) ?? otherId,
-    hops: 0,
     phase: Math.random() * Math.PI * 2,
   });
 }
 
-function fireThruster(node: Node, dirX: number, dirY: number): void {
+function fireThruster(node: Node): void {
   node.signalTimer = Math.min(SIGNAL_FIRE_CAP, node.signalTimer + SIGNAL_FIRE_TIME);
-  node.signalGoalX = dirX;
-  node.signalGoalY = dirY;
 }
 
 export function updateSignals(world: World, goal: Goal, dt: number): void {
@@ -79,7 +76,7 @@ export function updateSignals(world: World, goal: Goal, dt: number): void {
   }
 
   for (const sensor of world.nodes.values()) {
-    if (sensor.type !== "sensor") continue;
+    if (sensor.type !== "sensor" || !sensor.emitting) continue;
     if (world.degree(sensor.id) === 0) {
       emitAcc.delete(sensor.id);
       continue;
@@ -120,10 +117,8 @@ export function updateSignals(world: World, goal: Goal, dt: number): void {
       sig.t -= 1;
 
       const node = world.nodes.get(sig.toId);
-      if (node && node.type === "thruster") fireThruster(node, sig.dirX, sig.dirY);
-
-      sig.hops++;
-      if (sig.hops >= SIGNAL_HOP_LIMIT) {
+      if (node && node.type === "thruster") {
+        fireThruster(node);
         dead = true;
         break;
       }

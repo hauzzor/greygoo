@@ -16,15 +16,9 @@ export function applyGuidance(world: World, power: number, dt: number): void {
     const dirY = thruster.dirY;
     if (dirX === 0 && dirY === 0) continue;
 
-    const weight = Math.max(
-      0,
-      dirX * thruster.signalGoalX + dirY * thruster.signalGoalY,
-    );
-    if (weight <= 0) continue;
-
-    thruster.accel.x += dirX * weight * power;
-    thruster.accel.y += dirY * weight * power;
-    thruster.firing = Math.max(thruster.firing, weight);
+    thruster.accel.x += dirX * power;
+    thruster.accel.y += dirY * power;
+    thruster.firing = 1;
   }
 }
 

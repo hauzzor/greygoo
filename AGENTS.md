@@ -82,11 +82,12 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   blocks and can be dragged directly over them. It is rendered translucent while
   held.
 - **Travellers:** every entity that moves along the structure — absorbed blocks
-  (crawlers) and signal blobs. Each traveller picks a **random block in its own
-  connected component** as a movement goal and travels there by the **shortest
-  path** (BFS over beams, `nextStepToward`). On arriving it picks a new random
-  goal; if its goal is removed (or becomes unreachable) it immediately picks
-  another. See `src/game/travellers.ts`.
+  (crawlers) and signal blobs. Each traveller picks a block in its own connected
+  component as a movement goal (weighted: the more node-jumps away, the more
+  likely, so far blocks are favoured) and travels there by the **shortest path**
+  (BFS over beams, `nextStepToward`). On arriving it picks a new goal; if its
+  goal is removed (or becomes unreachable) it immediately picks another. See
+  `src/game/travellers.ts`.
 - **Absorb & crawl (World-of-Goo style):** a loose block that collides with the
   structure (a beam or a structure block) is absorbed and then travels
   block-to-block **along the beams** as a kinematic, non-colliding traveller
@@ -106,19 +107,25 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   it, so the held preview never shows a crossing link. As a safety net,
   `removeCrossingBeams` deletes the **younger** beam of any crossing pair right
   after a drop (beams are ordered by creation; order survives undo).
-- **Thruster thrust vector is derived live from its connected neighbours**: it
-  points toward the (normalized, averaged) connected-neighbour positions. It is
-  computed **once per frame** into `node.dirX/dirY` (used by both physics and
-  rendering). A thruster with no neighbours produces no thrust.
+- **Thruster direction is fixed at build time**: it points toward the
+  (normalized, averaged) connected-neighbour positions **captured when its
+  connections change** (`captureThrustDirection`, hooked to
+  `World.onTopologyChange`), then frozen — later live motion does not change it.
+  It is stored in `node.dirX/dirY` (used by physics and rendering). A thruster
+  with no neighbours has no direction. When activated it thrusts **full force**
+  along that direction (no goal weighting).
 - **Sensor** emits **signal blobs** discretely (not an instant broadcast): every
-  second while running, a connected sensor spawns one blob onto **each** of its
-  beams. A blob captures the sensor's unit vector to the goal at emission (shown
-  as a direction chevron) and moves beam-to-beam as a traveller (shortest path to
-  a random in-component goal). On reaching each block it fires that thruster if
-  it is one; after reaching the **second** block it disappears. A hit sets the thruster's `signalTimer` (`+1s`, capped at `3s`,
-  refreshing/staking on further hits). While a thruster's timer is positive it
-  fires along its own neighbour-derived direction, weighted by
-  `max(0, dot(dir, signalGoal))` times thrust power. Pausing clears the blobs.
+  second while running, a connected and **emitting** sensor spawns one blob onto
+  **each** of its beams. A blob captures the sensor's unit vector to the goal at
+  emission (shown as a direction chevron) and moves beam-to-beam as a traveller
+  (shortest path to a distance-weighted in-component goal). It **lives until it
+  reaches a thruster**, which it fires and then vanishes (if the component has no
+  thruster it roams indefinitely; a soft cap limits total blobs). A hit sets the
+  thruster's `signalTimer` (`+1s`, capped at `3s`, staking on further hits).
+  Pausing clears the blobs.
+- **Individual sensor control**: a dropdown lists sensors and an **Emit**
+  button toggles the selected sensor's `emitting` flag, pausing/resuming its
+  signal emission without affecting other sensors.
 - **Run/Pause** button (Space) toggles all abilities (thrusters + sensors)
   globally. Pausing zeroes every block's `firing`.
 - **Camera block**: placing one adds it to a dropdown. A dedicated **Camera**
@@ -154,7 +161,7 @@ src/style.css         frosted light-green HUD styling
 src/core/vec2.ts      vector helpers
 src/core/types.ts     BlockType, Node, Beam, Goal, Tool, WorldSnapshot
 src/core/physics.ts   World: Verlet+stiff constraints, adjacency index, spatial-hash separation, snapshot/restore
-src/core/cell.ts      adjacency BFS/autoConnect/preview, thrustDirection + updateThrustDirections
+src/core/cell.ts      adjacency BFS/autoConnect/preview, thrustDirection capture/sync
 src/game/level.ts     goal definition
 src/game/editor.ts    BLOCK_RADIUS, scatterBlocks (starting supply)
 src/game/simulation.ts applyGuidance (signal-driven thruster firing); checkWin kept for future win logic

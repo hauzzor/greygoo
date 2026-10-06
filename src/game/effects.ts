@@ -2,7 +2,6 @@ import type { World } from "../core/physics";
 import type { Goal } from "../core/types";
 import type { Camera } from "../render/camera";
 import type { Particles } from "../render/particles";
-import { thrustDirection } from "../core/cell";
 
 const MOTE: [number, number, number] = [200, 240, 190];
 const BUBBLE: [number, number, number] = [220, 255, 235];
@@ -63,8 +62,8 @@ export function emitThrusterExhaust(
 ): void {
   for (const node of world.nodes.values()) {
     if (node.type !== "thruster" || node.firing <= 0.01) continue;
-    const dir = thrustDirection(world, node.id);
-    if (!dir) continue;
+    if (node.dirX === 0 && node.dirY === 0) continue;
+    const dir = { x: node.dirX, y: node.dirY };
 
     const rate = 30 + node.firing * 80;
     const expected = rate * dt;

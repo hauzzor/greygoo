@@ -39,6 +39,20 @@ export class World {
 
   onAbsorb: ((nodeId: number, beam: Beam, t: number) => boolean) | null = null;
   onAbsorbNode: ((looseId: number, structId: number) => boolean) | null = null;
+  onTopologyChange: ((ids: number[]) => void) | null = null;
+
+  private notifyTopology(ids: number[]): void {
+    if (this.onTopologyChange && ids.length > 0) this.onTopologyChange(ids);
+  }
+
+  private incidentNeighbors(id: number): number[] {
+    const out: number[] = [];
+    for (const beam of this.beams) {
+      if (beam.a === id) out.push(beam.b);
+      else if (beam.b === id) out.push(beam.a);
+    }
+    return out;
+  }
 
   addNode(type: BlockType, pos: { x: number; y: number }, radius: number): Node {
     const node: Node = {
@@ -53,9 +67,8 @@ export class World {
       dirX: 0,
       dirY: 0,
       ghost: false,
+      emitting: true,
       signalTimer: 0,
-      signalGoalX: 0,
-      signalGoalY: 0,
     };
     this.nodes.set(node.id, node);
     if (!this.beamsByNode.has(node.id)) this.beamsByNode.set(node.id, []);
@@ -67,6 +80,7 @@ export class World {
     const beam: Beam = { a, b, rest };
     this.beams.push(beam);
     this.indexBeam(beam);
+    this.notifyTopology([a, b]);
     return beam;
   }
 
@@ -101,24 +115,33 @@ export class World {
   }
 
   removeNode(id: number): void {
+    const affected = this.incidentNeighbors(id);
     this.nodes.delete(id);
     const before = this.beams.length;
     this.beams = this.beams.filter((b) => b.a !== id && b.b !== id);
     if (this.beams.length !== before) this.reindex();
     else this.beamsByNode.delete(id);
+    this.notifyTopology(affected);
   }
 
   detachNode(id: number): void {
+    const affected = this.incidentNeighbors(id);
     const before = this.beams.length;
     this.beams = this.beams.filter((b) => b.a !== id && b.b !== id);
     if (this.beams.length !== before) this.reindex();
+    this.notifyTopology(affected);
   }
 
   removeBeams(list: readonly Beam[]): void {
     if (list.length === 0) return;
+    const affected: number[] = [];
+    for (const b of list) {
+      affected.push(b.a, b.b);
+    }
     const set = new Set(list);
     this.beams = this.beams.filter((b) => !set.has(b));
     this.reindex();
+    this.notifyTopology(affected);
   }
 
   clear(): void {
@@ -163,9 +186,8 @@ export class World {
         dirX: 0,
         dirY: 0,
         ghost: false,
+        emitting: true,
         signalTimer: 0,
-        signalGoalX: 0,
-        signalGoalY: 0,
       });
     }
     this.beams = snap.beams.map((b) => ({ a: b.a, b: b.b, rest: b.rest }));

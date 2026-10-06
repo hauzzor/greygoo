@@ -3,9 +3,10 @@ import { World } from "./core/physics";
 import {
   CONNECT_MAX,
   autoConnect,
+  captureThrustDirection,
   previewConnections,
   removeCrossingBeams,
-  updateThrustDirections,
+  syncThrustDirections,
 } from "./core/cell";
 import {
   clearCrawlers,
@@ -40,6 +41,9 @@ const camera = new Camera();
 const particles = new Particles();
 const goal = createGoal();
 installCrawlHooks(world);
+world.onTopologyChange = (ids) => {
+  for (const id of ids) captureThrustDirection(world, id);
+};
 
 let tool: Tool = "select";
 let selectedId: number | null = null;
@@ -56,6 +60,7 @@ const history: WorldSnapshot[] = [];
 
 let cameraLocked = false;
 let selectedCameraId: number | null = null;
+let selectedSensorId: number | null = null;
 
 const hud = createHud({
   onTool: (t) => setTool(t),
@@ -64,6 +69,11 @@ const hud = createHud({
   onSelectCamera: (id) => {
     selectedCameraId = id;
   },
+  onSelectSensor: (id) => {
+    selectedSensorId = id;
+    syncSensorOptions();
+  },
+  onToggleSensor: () => toggleSensor(),
   onUndo: () => undo(),
   onClear: () => clearAll(),
 });
@@ -84,6 +94,7 @@ function undo(): void {
   clearCrawlers();
   clearSignals();
   world.restore(snap);
+  syncThrustDirections(world);
   selectedId = null;
   dragNodeId = null;
   hud.banner(null);
@@ -95,6 +106,7 @@ function resetScatter(): void {
   world.clear();
   particles.clear();
   scatterBlocks(world);
+  syncThrustDirections(world);
   selectedId = null;
   dragNodeId = null;
   dragStart = null;
@@ -172,12 +184,54 @@ function syncCameraOptions(): void {
   hud.setCameraOptions(options, selectedCameraId);
 }
 
+function firstSensorId(): number | null {
+  for (const node of world.nodes.values()) {
+    if (node.type === "sensor") return node.id;
+  }
+  return null;
+}
+
+function toggleSensor(): void {
+  if (selectedSensorId === null || !world.nodes.has(selectedSensorId)) {
+    const first = firstSensorId();
+    if (first === null) return;
+    selectedSensorId = first;
+  }
+  const node = world.nodes.get(selectedSensorId);
+  if (!node || node.type !== "sensor") return;
+  node.emitting = !node.emitting;
+  syncSensorOptions();
+}
+
+function syncSensorOptions(): void {
+  const options: { id: number; label: string }[] = [];
+  for (const node of world.nodes.values()) {
+    if (node.type === "sensor") {
+      options.push({ id: node.id, label: `Sensor #${node.id}` });
+    }
+  }
+  if (
+    selectedSensorId !== null &&
+    !options.some((o) => o.id === selectedSensorId)
+  ) {
+    selectedSensorId = options.length > 0 ? options[0].id : null;
+  }
+  if (selectedSensorId === null && options.length > 0) {
+    selectedSensorId = options[0].id;
+  }
+  hud.setSensorOptions(options, selectedSensorId);
+  const sel =
+    selectedSensorId === null ? null : world.nodes.get(selectedSensorId);
+  hud.setSensorEmitting(sel ? sel.emitting : false);
+}
+
 function startNewGame(): void {
   history.length = 0;
   resetScatter();
   running = false;
   cameraLocked = false;
   selectedCameraId = null;
+  selectedSensorId = null;
   hud.setRunning(false);
   hud.setCameraLock(false);
   hud.banner(null);
@@ -382,8 +436,6 @@ function update(dt: number): void {
   world.params.damping = Math.exp(-p.drag * dt);
   camera.decayKick(dt);
 
-  updateThrustDirections(world);
-
   if (running) {
     updateSignals(world, goal, dt);
     applyGuidance(world, p.power, dt);
@@ -437,6 +489,7 @@ function draw(): void {
   );
 
   syncCameraOptions();
+  syncSensorOptions();
 
   const c = world.centroid();
   const distance =

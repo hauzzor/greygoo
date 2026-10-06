@@ -13,23 +13,32 @@ function otherEnd(beam: Beam, id: number): number {
 }
 
 export function pickGoal(world: World, fromId: number): number | null {
-  const seen = new Set<number>([fromId]);
+  const dist = new Map<number, number>([[fromId, 0]]);
   const queue: number[] = [fromId];
   const candidates: number[] = [];
+  let total = 0;
 
   for (let i = 0; i < queue.length; i++) {
     const id = queue[i];
+    const next = (dist.get(id) ?? 0) + 1;
     for (const beam of world.neighbors(id)) {
       const other = otherEnd(beam, id);
-      if (seen.has(other) || !world.nodes.has(other)) continue;
-      seen.add(other);
+      if (dist.has(other) || !world.nodes.has(other)) continue;
+      dist.set(other, next);
       candidates.push(other);
+      total += next;
       queue.push(other);
     }
   }
 
   if (candidates.length === 0) return null;
-  return candidates[Math.floor(Math.random() * candidates.length)];
+
+  let roll = Math.random() * total;
+  for (const id of candidates) {
+    roll -= dist.get(id) ?? 1;
+    if (roll <= 0) return id;
+  }
+  return candidates[candidates.length - 1];
 }
 
 export function nextStepToward(
