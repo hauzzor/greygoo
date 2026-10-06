@@ -174,6 +174,8 @@ export function render(
         : null;
     const cameraActive =
       state.cameraLocked && node.id === state.selectedCameraId;
+    const isHeld = node.id === state.heldId;
+    if (isHeld) ctx.globalAlpha = 0.6;
     drawBlock(
       ctx,
       node.type,
@@ -188,6 +190,7 @@ export function render(
       node,
       cameraActive,
     );
+    if (isHeld) ctx.globalAlpha = 1;
   }
 
   if (state.selectedId !== null) {

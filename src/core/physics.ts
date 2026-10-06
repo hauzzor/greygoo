@@ -49,6 +49,7 @@ export class World {
       firing: 0,
       dirX: 0,
       dirY: 0,
+      ghost: false,
     };
     this.nodes.set(node.id, node);
     if (!this.beamsByNode.has(node.id)) this.beamsByNode.set(node.id, []);
@@ -107,6 +108,13 @@ export class World {
     if (this.beams.length !== before) this.reindex();
   }
 
+  removeBeams(list: readonly Beam[]): void {
+    if (list.length === 0) return;
+    const set = new Set(list);
+    this.beams = this.beams.filter((b) => !set.has(b));
+    this.reindex();
+  }
+
   clear(): void {
     this.nodes.clear();
     this.beams = [];
@@ -148,6 +156,7 @@ export class World {
         firing: 0,
         dirX: 0,
         dirY: 0,
+        ghost: false,
       });
     }
     this.beams = snap.beams.map((b) => ({ a: b.a, b: b.b, rest: b.rest }));
@@ -223,7 +232,7 @@ export class World {
     const { damping, maxVelocity } = this.params;
 
     for (const n of this.nodes.values()) {
-      if (n.invMass === 0) {
+      if (n.invMass === 0 || n.ghost) {
         n.prev.x = n.pos.x;
         n.prev.y = n.pos.y;
         n.accel.x = 0;
@@ -314,7 +323,7 @@ export class World {
     }
 
     for (const node of this.nodes.values()) {
-      if (node.invMass === 0) continue;
+      if (node.invMass === 0 || node.ghost) continue;
 
       const key = cellKey(
         Math.floor(node.pos.x / cell),
@@ -386,6 +395,7 @@ export class World {
           if (!bucket) continue;
           for (const b of bucket) {
             if (b.id <= a.id) continue;
+            if (a.ghost || b.ghost) continue;
 
             const dx = b.pos.x - a.pos.x;
             const dy = b.pos.y - a.pos.y;

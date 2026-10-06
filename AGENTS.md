@@ -74,12 +74,22 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   **detaches** it (its beams are removed) — a plain click selects without
   detaching. Loose blocks are dynamic at rest and can be nudged by a moving
   structure.
+- **The held ("ghost") block has no physical interaction**: `Node.ghost` makes
+  it skip integration, separation, and beam collision, so it never pushes other
+  blocks and can be dragged directly over them. It is rendered translucent while
+  held.
 - Beams auto-form between blocks within the connect radius (slider, default
   `90`, max `320`); **stiff springs** (Advanced "Beam rigidity", default `0.9`),
   a little wobbly but **non-breaking**.
 - Beams are **solid**: a block cannot pass through a beam it is not attached to.
   `World.solveBeamCollision` treats each beam as a capsule and pushes out any
   node intersecting it (endpoints of the beam are ignored), using a spatial grid.
+- **Beams never cross** (enforced when building, not during live motion).
+  `beamWouldCross` (in `cell.ts`) rejects any connection that would properly
+  intersect an existing beam — `autoConnect` and `previewConnections` both apply
+  it, so the held preview never shows a crossing link. As a safety net,
+  `removeCrossingBeams` deletes the **younger** beam of any crossing pair right
+  after a drop (beams are ordered by creation; order survives undo).
 - **Thruster thrust vector is derived live from its connected neighbours**: it
   points toward the (normalized, averaged) connected-neighbour positions. It is
   computed **once per frame** into `node.dirX/dirY` (used by both physics and

@@ -3,6 +3,7 @@ import { World } from "./core/physics";
 import {
   autoConnect,
   previewConnections,
+  removeCrossingBeams,
   updateThrustDirections,
 } from "./core/cell";
 import type { Tool, WorldSnapshot } from "./core/types";
@@ -197,7 +198,10 @@ function selectAndDrag(id: number): void {
   dragMoved = false;
   dragDetached = false;
   const n = world.nodes.get(id);
-  if (n) n.invMass = 0;
+  if (n) {
+    n.invMass = 0;
+    n.ghost = true;
+  }
 }
 
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -274,7 +278,9 @@ function endPointer(): void {
     const n = world.nodes.get(id);
     if (n) {
       n.invMass = 1;
-      autoConnect(world, id, hud.params().connectRadius);
+      n.ghost = false;
+      const added = autoConnect(world, id, hud.params().connectRadius);
+      removeCrossingBeams(world, added);
       n.prev.x = n.pos.x;
       n.prev.y = n.pos.y;
       if (world.degree(id) > 0) {

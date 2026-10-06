@@ -1,4 +1,5 @@
 import type { World } from "./physics";
+import type { Beam } from "./types";
 import type { Vec2 } from "./vec2";
 
 export function connectedComponent(world: World, startId: number): Set<number> {
@@ -19,15 +20,79 @@ export function connectedComponent(world: World, startId: number): Set<number> {
   return seen;
 }
 
+function orient(
+  ox: number,
+  oy: number,
+  px: number,
+  py: number,
+  qx: number,
+  qy: number,
+): number {
+  return (px - ox) * (qy - oy) - (py - oy) * (qx - ox);
+}
+
+function segmentsCross(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+  dx: number,
+  dy: number,
+): boolean {
+  const d1 = orient(cx, cy, dx, dy, ax, ay);
+  const d2 = orient(cx, cy, dx, dy, bx, by);
+  const d3 = orient(ax, ay, bx, by, cx, cy);
+  const d4 = orient(ax, ay, bx, by, dx, dy);
+  return (
+    ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+    ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+  );
+}
+
+export function beamWouldCross(
+  world: World,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): boolean {
+  const minX = Math.min(ax, bx);
+  const maxX = Math.max(ax, bx);
+  const minY = Math.min(ay, by);
+  const maxY = Math.max(ay, by);
+
+  for (const beam of world.beams) {
+    const a = world.nodes.get(beam.a);
+    const b = world.nodes.get(beam.b);
+    if (!a || !b) continue;
+
+    if (Math.max(a.pos.x, b.pos.x) < minX || Math.min(a.pos.x, b.pos.x) > maxX) {
+      continue;
+    }
+    if (Math.max(a.pos.y, b.pos.y) < minY || Math.min(a.pos.y, b.pos.y) > maxY) {
+      continue;
+    }
+    if (
+      segmentsCross(ax, ay, bx, by, a.pos.x, a.pos.y, b.pos.x, b.pos.y)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function autoConnect(
   world: World,
   id: number,
   radius: number,
   maxPerNode = 6,
-): void {
+): Beam[] {
+  const added: Beam[] = [];
   const node = world.nodes.get(id);
-  if (!node) return;
-  if (world.degree(id) >= maxPerNode) return;
+  if (!node) return added;
+  if (world.degree(id) >= maxPerNode) return added;
 
   world.forEachNear(node.pos.x, node.pos.y, radius, (other) => {
     if (other.id === id) return;
@@ -39,8 +104,15 @@ export function autoConnect(
     const dx = other.pos.x - node.pos.x;
     const dy = other.pos.y - node.pos.y;
     const d = Math.hypot(dx, dy);
-    if (d <= radius && d > 0) world.addBeam(id, other.id, d);
+    if (d <= radius && d > 0) {
+      if (beamWouldCross(world, node.pos.x, node.pos.y, other.pos.x, other.pos.y)) {
+        return;
+      }
+      added.push(world.addBeam(id, other.id, d));
+    }
   });
+
+  return added;
 }
 
 export function previewConnections(
@@ -54,9 +126,53 @@ export function previewConnections(
     if (result.length >= maxPerNode) return;
     if (world.degree(other.id) >= maxPerNode) return;
     const d = Math.hypot(other.pos.x - pos.x, other.pos.y - pos.y);
-    if (d <= radius && d > 0) result.push(other.id);
+    if (d <= radius && d > 0) {
+      if (beamWouldCross(world, pos.x, pos.y, other.pos.x, other.pos.y)) return;
+      result.push(other.id);
+    }
   });
   return result;
+}
+
+export function removeCrossingBeams(
+  world: World,
+  newBeams: readonly Beam[],
+): Beam[] {
+  if (newBeams.length === 0) return [];
+  const remove = new Set<Beam>();
+
+  for (const nb of newBeams) {
+    if (remove.has(nb)) continue;
+    const na = world.nodes.get(nb.a);
+    const nbn = world.nodes.get(nb.b);
+    if (!na || !nbn) continue;
+
+    for (const other of world.beams) {
+      if (other === nb || remove.has(other)) continue;
+      const oa = world.nodes.get(other.a);
+      const ob = world.nodes.get(other.b);
+      if (!oa || !ob) continue;
+      if (
+        segmentsCross(
+          na.pos.x,
+          na.pos.y,
+          nbn.pos.x,
+          nbn.pos.y,
+          oa.pos.x,
+          oa.pos.y,
+          ob.pos.x,
+          ob.pos.y,
+        )
+      ) {
+        remove.add(nb);
+        break;
+      }
+    }
+  }
+
+  const removed = [...remove];
+  if (removed.length > 0) world.removeBeams(removed);
+  return removed;
 }
 
 export function thrustDirection(world: World, id: number): Vec2 | null {

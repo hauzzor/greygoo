@@ -13,6 +13,7 @@ export interface Node {
   firing: number;
   dirX: number;
   dirY: number;
+  ghost: boolean;
 }
 
 export interface Beam {
