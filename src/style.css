@@ -54,6 +54,10 @@ body {
   align-items: center;
 }
 
+.hud[hidden] {
+  display: none;
+}
+
 .hud-top {
   top: 12px;
   left: 12px;

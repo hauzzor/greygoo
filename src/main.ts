@@ -1,11 +1,19 @@
 import "./style.css";
 import { World } from "./core/physics";
 import {
+  CONNECT_MAX,
   autoConnect,
   previewConnections,
   removeCrossingBeams,
   updateThrustDirections,
 } from "./core/cell";
+import {
+  clearCrawlers,
+  installCrawlHooks,
+  isCrawling,
+  releaseCrawler,
+  updateCrawlers,
+} from "./game/crawl";
 import type { Tool, WorldSnapshot } from "./core/types";
 import { Camera } from "./render/camera";
 import { Particles } from "./render/particles";
@@ -30,6 +38,7 @@ const world = new World();
 const camera = new Camera();
 const particles = new Particles();
 const goal = createGoal();
+installCrawlHooks(world);
 
 let tool: Tool = "select";
 let selectedId: number | null = null;
@@ -71,6 +80,7 @@ function pushHistory(): void {
 function undo(): void {
   const snap = history.pop();
   if (!snap) return;
+  clearCrawlers();
   world.restore(snap);
   selectedId = null;
   dragNodeId = null;
@@ -78,6 +88,7 @@ function undo(): void {
 }
 
 function resetScatter(): void {
+  clearCrawlers();
   world.clear();
   particles.clear();
   scatterBlocks(world);
@@ -197,6 +208,7 @@ function selectAndDrag(id: number): void {
   dragStart = world.snapshot();
   dragMoved = false;
   dragDetached = false;
+  if (isCrawling(id)) releaseCrawler(world, id);
   const n = world.nodes.get(id);
   if (n) {
     n.invMass = 0;
@@ -279,7 +291,7 @@ function endPointer(): void {
     if (n) {
       n.invMass = 1;
       n.ghost = false;
-      const added = autoConnect(world, id, hud.params().connectRadius);
+      const added = autoConnect(world, id);
       removeCrossingBeams(world, added);
       n.prev.x = n.pos.x;
       n.prev.y = n.pos.y;
@@ -368,6 +380,7 @@ function update(dt: number): void {
   if (running) applyGuidance(world, goal, p.power);
 
   world.step(dt);
+  updateCrawlers(world, dt);
 
   if (running) emitThrusterExhaust(world, particles, dt);
 
@@ -391,11 +404,7 @@ function draw(): void {
   if (dragNodeId !== null) {
     const held = world.nodes.get(dragNodeId);
     if (held) {
-      heldNeighbours = previewConnections(
-        world,
-        held.pos,
-        hud.params().connectRadius,
-      );
+      heldNeighbours = previewConnections(world, held.pos);
     }
   }
 
@@ -407,7 +416,7 @@ function draw(): void {
     {
       running,
       selectedId,
-      connectRadius: hud.params().connectRadius,
+      connectRadius: CONNECT_MAX,
       time: performance.now() / 1000,
       cameraLocked,
       selectedCameraId,

@@ -78,9 +78,17 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   it skip integration, separation, and beam collision, so it never pushes other
   blocks and can be dragged directly over them. It is rendered translucent while
   held.
-- Beams auto-form between blocks within the connect radius (slider, default
-  `90`, max `320`); **stiff springs** (Advanced "Beam rigidity", default `0.9`),
-  a little wobbly but **non-breaking**.
+- **Absorb & crawl (World-of-Goo style):** a loose block that collides with the
+  structure (a beam or a structure block) is absorbed and then travels
+  block-to-block **along the beams** as a kinematic, non-colliding crawler. At
+  each node it picks a random beam, never immediately reversing onto the one it
+  came from unless that is the only option. The player can still grab a crawling
+  block and place it. See `src/game/crawl.ts` (hooks `World.onAbsorb` /
+  `onAbsorbNode`).
+- Beams auto-form between blocks only when they are **50–100 apart**
+  (`CONNECT_MIN`/`CONNECT_MAX` in `cell.ts`); **stiff springs** (rigidity `0.9`),
+  a little wobbly but **non-breaking**. The settings panel is hidden, so the
+  physics params use their defaults (thrust `600`, drag `1.5`).
 - Beams are **solid**: a block cannot pass through a beam it is not attached to.
   `World.solveBeamCollision` treats each beam as a capsule and pushes out any
   node intersecting it (endpoints of the beam are ignored), using a spatial grid.
@@ -138,6 +146,7 @@ src/game/level.ts     goal definition
 src/game/editor.ts    BLOCK_RADIUS, scatterBlocks (starting supply)
 src/game/simulation.ts applyGuidance (sensor->thrusters); checkWin kept for future win logic
 src/game/effects.ts   ambient life, thruster exhaust, placement/run/win FX
+src/game/crawl.ts     absorb-on-contact + random-walk crawlers along beams
 src/render/camera.ts  pan/zoom, world<->screen, follow, "kick" punch
 src/render/sprites.ts offscreen sprite/tile cache (glow, background, particle dots)
 src/render/particles.ts pooled particle system (world-space, sprite dots, additive glow)

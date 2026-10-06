@@ -2,6 +2,9 @@ import type { World } from "./physics";
 import type { Beam } from "./types";
 import type { Vec2 } from "./vec2";
 
+export const CONNECT_MIN = 50;
+export const CONNECT_MAX = 100;
+
 export function connectedComponent(world: World, startId: number): Set<number> {
   const seen = new Set<number>([startId]);
   const queue: number[] = [startId];
@@ -83,18 +86,13 @@ export function beamWouldCross(
   return false;
 }
 
-export function autoConnect(
-  world: World,
-  id: number,
-  radius: number,
-  maxPerNode = 6,
-): Beam[] {
+export function autoConnect(world: World, id: number, maxPerNode = 6): Beam[] {
   const added: Beam[] = [];
   const node = world.nodes.get(id);
   if (!node) return added;
   if (world.degree(id) >= maxPerNode) return added;
 
-  world.forEachNear(node.pos.x, node.pos.y, radius, (other) => {
+  world.forEachNear(node.pos.x, node.pos.y, CONNECT_MAX, (other) => {
     if (other.id === id) return;
     if (world.degree(id) >= maxPerNode || world.degree(other.id) >= maxPerNode) {
       return;
@@ -104,7 +102,7 @@ export function autoConnect(
     const dx = other.pos.x - node.pos.x;
     const dy = other.pos.y - node.pos.y;
     const d = Math.hypot(dx, dy);
-    if (d <= radius && d > 0) {
+    if (d >= CONNECT_MIN && d <= CONNECT_MAX) {
       if (beamWouldCross(world, node.pos.x, node.pos.y, other.pos.x, other.pos.y)) {
         return;
       }
@@ -118,15 +116,14 @@ export function autoConnect(
 export function previewConnections(
   world: World,
   pos: Vec2,
-  radius: number,
   maxPerNode = 6,
 ): number[] {
   const result: number[] = [];
-  world.forEachNear(pos.x, pos.y, radius, (other) => {
+  world.forEachNear(pos.x, pos.y, CONNECT_MAX, (other) => {
     if (result.length >= maxPerNode) return;
     if (world.degree(other.id) >= maxPerNode) return;
     const d = Math.hypot(other.pos.x - pos.x, other.pos.y - pos.y);
-    if (d <= radius && d > 0) {
+    if (d >= CONNECT_MIN && d <= CONNECT_MAX) {
       if (beamWouldCross(world, pos.x, pos.y, other.pos.x, other.pos.y)) return;
       result.push(other.id);
     }

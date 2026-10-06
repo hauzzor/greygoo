@@ -4,7 +4,6 @@ export interface HudParams {
   power: number;
   drag: number;
   stiffness: number;
-  connectRadius: number;
 }
 
 export interface CameraOption {
@@ -59,11 +58,9 @@ export function createHud(handlers: HudHandlers): Hud {
   const power = el<HTMLInputElement>("power");
   const drag = el<HTMLInputElement>("drag");
   const stiff = el<HTMLInputElement>("stiff");
-  const connect = el<HTMLInputElement>("connect");
   const powerVal = el<HTMLElement>("power-val");
   const dragVal = el<HTMLElement>("drag-val");
   const stiffVal = el<HTMLElement>("stiff-val");
-  const connectVal = el<HTMLElement>("connect-val");
 
   const statNodes = el<HTMLElement>("stat-nodes");
   const statBeams = el<HTMLElement>("stat-beams");
@@ -78,12 +75,10 @@ export function createHud(handlers: HudHandlers): Hud {
     powerVal.textContent = power.value;
     dragVal.textContent = Number(drag.value).toFixed(1);
     stiffVal.textContent = Number(stiff.value).toFixed(2);
-    connectVal.textContent = connect.value;
   };
   power.addEventListener("input", syncLabel);
   drag.addEventListener("input", syncLabel);
   stiff.addEventListener("input", syncLabel);
-  connect.addEventListener("input", syncLabel);
   syncLabel();
 
   for (const button of toolButtons) {
@@ -167,7 +162,6 @@ export function createHud(handlers: HudHandlers): Hud {
       power: Number(power.value),
       drag: Number(drag.value),
       stiffness: Number(stiff.value),
-      connectRadius: Number(connect.value),
     }),
   };
 

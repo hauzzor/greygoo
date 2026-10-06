@@ -37,6 +37,9 @@ export class World {
 
   private beamsByNode = new Map<number, Beam[]>();
 
+  onAbsorb: ((nodeId: number, beam: Beam, t: number) => boolean) | null = null;
+  onAbsorbNode: ((looseId: number, structId: number) => boolean) | null = null;
+
   addNode(type: BlockType, pos: { x: number; y: number }, radius: number): Node {
     const node: Node = {
       id: this.nextId++,
@@ -332,6 +335,8 @@ export class World {
       const list = beamGrid.get(key);
       if (!list) continue;
 
+      const isLoose = this.onAbsorb !== null && this.degree(node.id) === 0;
+
       for (const bi of list) {
         const beam = this.beams[bi];
         if (beam.a === node.id || beam.b === node.id) continue;
@@ -356,6 +361,10 @@ export class World {
         let d = Math.hypot(dx, dy);
         const min = node.radius + BEAM_RADIUS;
         if (d >= min) continue;
+
+        if (isLoose && this.onAbsorb && this.onAbsorb(node.id, beam, t)) {
+          break;
+        }
 
         if (d < 1e-4) {
           const inv = 1 / Math.sqrt(len2);
@@ -402,6 +411,17 @@ export class World {
             const d2 = dx * dx + dy * dy;
             const min = a.radius + b.radius;
             if (d2 >= min * min || d2 === 0) continue;
+
+            if (this.onAbsorbNode) {
+              const aDeg = this.degree(a.id);
+              const bDeg = this.degree(b.id);
+              if (aDeg === 0 && bDeg > 0 && this.onAbsorbNode(a.id, b.id)) {
+                continue;
+              }
+              if (bDeg === 0 && aDeg > 0 && this.onAbsorbNode(b.id, a.id)) {
+                continue;
+              }
+            }
 
             const total = a.invMass + b.invMass;
             if (total === 0) continue;
