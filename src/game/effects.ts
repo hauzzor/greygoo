@@ -5,7 +5,7 @@ import type { Particles } from "../render/particles";
 
 const MOTE: [number, number, number] = [200, 240, 190];
 const BUBBLE: [number, number, number] = [220, 255, 235];
-const EXHAUST: [number, number, number] = [255, 214, 120];
+const EXHAUST: [number, number, number] = [120, 180, 255];
 const POLLEN: [number, number, number] = [255, 236, 170];
 const POP: [number, number, number] = [200, 255, 210];
 

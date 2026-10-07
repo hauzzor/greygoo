@@ -20,8 +20,8 @@ export interface RenderState {
 const LEAF_LIGHT = "#eafbe0";
 const LEAF = "#7fd992";
 const LEAF_MID = "#4aa863";
-const FIREFLY_HOT = "#fff2b8";
-const FIREFLY_DEEP = "#e8a92e";
+const FIREFLY_HOT = "#dff0ff";
+const FIREFLY_DEEP = "#2e6fe8";
 const PETAL_CORE = "#fff7c2";
 const SUNBEAM = "#ffe9a8";
 const SUNBEAM_RING = "#f7d774";
@@ -556,8 +556,8 @@ function drawThruster(
     const bx = x - Math.cos(angle) * (radius + len);
     const by = y - Math.sin(angle) * (radius + len);
     const grad = ctx.createLinearGradient(x, y, bx, by);
-    grad.addColorStop(0, `rgba(255, 236, 160, ${0.5 + firing * 0.4})`);
-    grad.addColorStop(1, "rgba(255, 200, 90, 0)");
+    grad.addColorStop(0, `rgba(200, 228, 255, ${0.5 + firing * 0.4})`);
+    grad.addColorStop(1, "rgba(90, 160, 255, 0)");
     ctx.beginPath();
     ctx.moveTo(x - Math.cos(angle) * radius, y - Math.sin(angle) * radius);
     ctx.lineTo(bx, by);
@@ -584,7 +584,7 @@ function drawSeed(
     x,
     y,
     radius * 2.6,
-    active ? "rgba(255, 210, 110, 0.35)" : "rgba(255, 210, 110, 0.18)",
+    active ? "rgba(120, 180, 255, 0.35)" : "rgba(120, 180, 255, 0.18)",
   );
   ctx.globalCompositeOperation = "source-over";
 
@@ -600,14 +600,14 @@ function drawSeed(
     0,
     radius * 1.1,
   );
-  grad.addColorStop(0, active ? FIREFLY_HOT : "#ffe9a8");
+  grad.addColorStop(0, active ? FIREFLY_HOT : "#bcd9ff");
   grad.addColorStop(1, FIREFLY_DEEP);
   ctx.beginPath();
   ctx.ellipse(0, 0, radius * 1.15, radius * 0.92, 0, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(120, 80, 20, 0.4)";
+  ctx.strokeStyle = "rgba(20, 60, 120, 0.4)";
   ctx.lineWidth = 1.4;
   ctx.stroke();
 
