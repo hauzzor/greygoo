@@ -97,8 +97,8 @@ console.log("1. Thrust direction stability");
   connect(w3, t3.id, only.id);
   captureThrustDirection(w3, t3.id);
   check(
-    "single neighbour gives an outward unit direction",
-    Math.abs(t3.dirX + 1) < 1e-9 && Math.abs(t3.dirY) < 1e-9,
+    "single neighbour gives a clean unit direction",
+    Math.abs(t3.dirX - 1) < 1e-9 && Math.abs(t3.dirY) < 1e-9,
     `dir=(${t3.dirX},${t3.dirY})`,
   );
 }
@@ -116,7 +116,7 @@ console.log("\n2. Global speed cap (single thruster, chain)");
     prev = cell.id;
   }
   captureThrustDirection(w, t.id);
-  t.signalGoalX = -1;
+  t.signalGoalX = 1;
   t.signalGoalY = 0;
 
   let peak = 0;
@@ -134,7 +134,7 @@ console.log("\n2. Global speed cap (single thruster, chain)");
   );
   check("positions stay finite", allFinite(w));
   const c = centroid(w);
-  check("structure thrusts outward (-x)", c.x < -20, `centroid.x=${c.x.toFixed(1)}`);
+  check("structure thrusts in +x", c.x > 20, `centroid.x=${c.x.toFixed(1)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ console.log("\n3. MAX_THRUST forces an identical trajectory above the cap");
       prev = cell.id;
     }
     captureThrustDirection(w, t.id);
-    t.signalGoalX = -1;
+    t.signalGoalX = 1;
     t.signalGoalY = 0;
     for (let s = 0; s < 120; s++) {
       t.impulse = true;
@@ -181,7 +181,7 @@ console.log("\n4. Signals fire a single impulse (no sustained burn)");
   connect(w, t.id, sensor.id);
   sensor.emitting = true;
   captureThrustDirection(w, t.id);
-  const goal: Goal = { pos: { x: -1000, y: 0 }, radius: 72 };
+  const goal: Goal = { pos: { x: 1000, y: 0 }, radius: 72 };
 
   let firedFrames = 0;
   let run = 0;
@@ -224,7 +224,7 @@ console.log("\n4b. Thruster only fires when aimed toward the goal");
   const cell = w.addNode("cell", { x: 60, y: 0 }, RADIUS);
   connect(w, t.id, cell.id);
   captureThrustDirection(w, t.id);
-  t.signalGoalX = 1;
+  t.signalGoalX = -1;
   t.signalGoalY = 0;
 
   for (let s = 0; s < 60; s++) {
