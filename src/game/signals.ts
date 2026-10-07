@@ -64,8 +64,10 @@ function spawn(world: World, sensor: Node, otherId: number, gx: number, gy: numb
   });
 }
 
-function fireThruster(node: Node): void {
+function fireThruster(node: Node, dirX: number, dirY: number): void {
   node.signalTimer = SIGNAL_FIRE_TIME;
+  node.signalGoalX = dirX;
+  node.signalGoalY = dirY;
 }
 
 export function updateSignals(world: World, goal: Goal, dt: number): void {
@@ -117,7 +119,7 @@ export function updateSignals(world: World, goal: Goal, dt: number): void {
 
       const node = world.nodes.get(sig.toId);
       if (node && node.type === "thruster") {
-        fireThruster(node);
+        fireThruster(node, sig.dirX, sig.dirY);
         dead = true;
         break;
       }
