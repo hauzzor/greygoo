@@ -200,7 +200,7 @@ export function thrustDirection(world: World, id: number): Vec2 | null {
   if (count === 0) return null;
   const len = Math.hypot(x, y);
   if (len < THRUST_DIR_MIN) return null;
-  return { x: x / len, y: y / len };
+  return { x: -x / len, y: -y / len };
 }
 
 export function captureThrustDirection(world: World, id: number): void {

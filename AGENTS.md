@@ -118,8 +118,8 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   it, so the held preview never shows a crossing link. As a safety net,
   `removeCrossingBeams` deletes the **younger** beam of any crossing pair right
   after a drop (beams are ordered by creation; order survives undo).
-- **Thruster direction is fixed at build time**: it points toward the
-  (normalized, averaged) connected-neighbour positions **captured when its
+- **Thruster direction is fixed at build time**: it points **outward**, away from
+  the (normalized, averaged) connected-neighbour positions, **captured when its
   connections change** (`captureThrustDirection`, hooked to
   `World.onTopologyChange`), then frozen — later live motion does not change it.
   It is stored in `node.dirX/dirY` (used by physics and rendering). A thruster
