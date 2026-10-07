@@ -5,6 +5,7 @@ import type { Vec2 } from "../core/vec2";
 import { sprites } from "./sprites";
 import { drawSignals, sensorColor, type SensorColor } from "../game/signals";
 import type { Particles, View } from "./particles";
+import { ROTATE_RING } from "../core/cell";
 
 export interface RenderState {
   running: boolean;
@@ -15,6 +16,7 @@ export interface RenderState {
   selectedCameraId: number | null;
   heldId: number | null;
   heldNeighbours: number[];
+  rotateId: number | null;
 }
 
 const LEAF_LIGHT = "#eafbe0";
@@ -209,6 +211,39 @@ export function render(
       ctx.arc(sel.pos.x, sel.pos.y, sel.radius + 5, 0, Math.PI * 2);
       ctx.strokeStyle = HALO;
       ctx.lineWidth = 2 / camera.scale;
+      ctx.stroke();
+    }
+  }
+
+  if (state.rotateId !== null) {
+    const rot = world.nodes.get(state.rotateId);
+    if (rot) {
+      const ringR = rot.radius + ROTATE_RING;
+
+      ctx.beginPath();
+      ctx.arc(rot.pos.x, rot.pos.y, ringR, 0, Math.PI * 2);
+      ctx.setLineDash([7 / camera.scale, 7 / camera.scale]);
+      ctx.strokeStyle = "rgba(255, 214, 110, 0.9)";
+      ctx.lineWidth = 2 / camera.scale;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const hx = rot.pos.x + rot.dirX * ringR;
+      const hy = rot.pos.y + rot.dirY * ringR;
+
+      ctx.beginPath();
+      ctx.moveTo(rot.pos.x, rot.pos.y);
+      ctx.lineTo(hx, hy);
+      ctx.strokeStyle = "rgba(255, 214, 110, 0.7)";
+      ctx.lineWidth = 1.5 / camera.scale;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(hx, hy, 6 / camera.scale, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 224, 130, 0.95)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(120, 80, 20, 0.6)";
+      ctx.lineWidth = 1.5 / camera.scale;
       ctx.stroke();
     }
   }
@@ -568,6 +603,56 @@ function drawThruster(
   }
 
   drawSeed(ctx, x, y, radius, angle, active);
+  drawThrustArrow(ctx, x, y, radius, angle);
+}
+
+function drawThrustArrow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  angle: number,
+): void {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const bx = x + cos * (radius + 1);
+  const by = y + sin * (radius + 1);
+  const tx = x + cos * (radius + 17);
+  const ty = y + sin * (radius + 17);
+
+  const hl = 7;
+  const hw = 0.52;
+  const lx = tx - Math.cos(angle - hw) * hl;
+  const ly = ty - Math.sin(angle - hw) * hl;
+  const rx = tx - Math.cos(angle + hw) * hl;
+  const ry = ty - Math.sin(angle + hw) * hl;
+
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(bx, by);
+  ctx.lineTo(tx, ty);
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(lx, ly);
+  ctx.lineTo(rx, ry);
+  ctx.closePath();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  ctx.strokeStyle = "#1b4f9c";
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(lx, ly);
+  ctx.lineTo(rx, ry);
+  ctx.closePath();
+  ctx.fillStyle = "#1b4f9c";
+  ctx.fill();
 }
 
 function drawSeed(

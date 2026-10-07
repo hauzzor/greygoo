@@ -17,10 +17,10 @@ export function placeBlock(
 }
 
 const SCATTER_LAYOUT: Array<[BlockType, number]> = [
-  ["cell", 14],
-  ["thruster", 5],
-  ["sensor", 3],
-  ["camera", 1],
+  ["cell", 28],
+  ["thruster", 10],
+  ["sensor", 6],
+  ["camera", 2],
 ];
 
 export function scatterBlocks(world: World): void {
@@ -40,7 +40,7 @@ export function scatterBlocks(world: World): void {
     const radius = BLOCK_RADIUS[type];
     let x = 0;
     let y = 0;
-    for (let attempt = 0; attempt < 60; attempt++) {
+    for (let attempt = 0; attempt < 80; attempt++) {
       const angle = Math.random() * Math.PI * 2;
       const dist = 150 + Math.random() * 340;
       x = Math.cos(angle) * dist;

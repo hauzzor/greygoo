@@ -13,6 +13,7 @@ export interface Node {
   firing: number;
   dirX: number;
   dirY: number;
+  dirManual: boolean;
   ghost: boolean;
   emitting: boolean;
   impulse: boolean;
@@ -37,6 +38,9 @@ export interface NodeSnapshot {
   x: number;
   y: number;
   radius: number;
+  dirX: number;
+  dirY: number;
+  dirManual: boolean;
 }
 
 export interface BeamSnapshot {

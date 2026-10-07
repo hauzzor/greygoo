@@ -2,6 +2,7 @@ import "./style.css";
 import { World } from "./core/physics";
 import {
   CONNECT_MAX,
+  ROTATE_RING,
   autoConnect,
   captureThrustDirection,
   previewConnections,
@@ -16,7 +17,7 @@ import {
   updateCrawlers,
 } from "./game/crawl";
 import { clearSignals, updateSignals } from "./game/signals";
-import type { Tool, WorldSnapshot } from "./core/types";
+import type { Node, Tool, WorldSnapshot } from "./core/types";
 import { Camera } from "./render/camera";
 import { Particles } from "./render/particles";
 import { render } from "./render/renderer";
@@ -57,6 +58,10 @@ let dragStart: WorldSnapshot | null = null;
 let dragMoved = false;
 let dragDetached = false;
 
+let rotateNodeId: number | null = null;
+let rotateDragging = false;
+let rotateMoved = false;
+
 const history: WorldSnapshot[] = [];
 
 let cameraLocked = false;
@@ -95,7 +100,31 @@ function buildBlockMenu(id: number): MenuModel | null {
       ],
     };
   }
+  if (n.type === "thruster") {
+    return {
+      title: `Thruster #${n.id}`,
+      actions: [{ label: "Rotate", onSelect: () => beginRotate(id) }],
+    };
+  }
   return null;
+}
+
+function beginRotate(id: number): void {
+  const n = world.nodes.get(id);
+  if (!n || n.type !== "thruster") return;
+  closeBlockMenu();
+  rotateNodeId = id;
+  rotateDragging = false;
+}
+
+function setRotateFromPointer(n: Node, wx: number, wy: number): void {
+  const dx = wx - n.pos.x;
+  const dy = wy - n.pos.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-3) return;
+  n.dirX = dx / len;
+  n.dirY = dy / len;
+  n.dirManual = true;
 }
 
 function openBlockMenu(id: number): void {
@@ -133,6 +162,8 @@ window.addEventListener(
 
 function setTool(t: Tool): void {
   tool = t;
+  rotateNodeId = null;
+  rotateDragging = false;
   document.body.dataset.tool = t;
   hud.setToolActive(t);
 }
@@ -150,6 +181,8 @@ function undo(): void {
   syncThrustDirections(world);
   selectedId = null;
   dragNodeId = null;
+  rotateNodeId = null;
+  rotateDragging = false;
   closeBlockMenu();
   hud.banner(null);
 }
@@ -166,6 +199,8 @@ function resetScatter(): void {
   dragStart = null;
   dragMoved = false;
   dragDetached = false;
+  rotateNodeId = null;
+  rotateDragging = false;
   closeBlockMenu();
 }
 
@@ -310,6 +345,20 @@ canvas.addEventListener("pointerdown", (e) => {
   }
 
   const w = camera.toWorld(sx, sy);
+
+  if (rotateNodeId !== null) {
+    const rot = world.nodes.get(rotateNodeId);
+    if (rot) {
+      const d = Math.hypot(w.x - rot.pos.x, w.y - rot.pos.y);
+      if (d <= rot.radius + ROTATE_RING + 10) {
+        rotateDragging = true;
+        rotateMoved = false;
+        return;
+      }
+    }
+    rotateNodeId = null;
+  }
+
   const hit = pickNode(w.x, w.y);
 
   if (hit !== null) {
@@ -337,6 +386,19 @@ canvas.addEventListener("pointermove", (e) => {
     return;
   }
 
+  if (rotateDragging && rotateNodeId !== null) {
+    const rot = world.nodes.get(rotateNodeId);
+    if (rot) {
+      if (!rotateMoved) {
+        pushHistory();
+        rotateMoved = true;
+      }
+      const w = camera.toWorld(sx, sy);
+      setRotateFromPointer(rot, w.x, w.y);
+    }
+    return;
+  }
+
   if (dragNodeId !== null) {
     const n = world.nodes.get(dragNodeId);
     if (n) {
@@ -357,6 +419,11 @@ canvas.addEventListener("pointermove", (e) => {
 });
 
 function endPointer(e: PointerEvent): void {
+  if (rotateDragging) {
+    rotateDragging = false;
+    rotateMoved = false;
+    return;
+  }
   if (panning) {
     panning = false;
     return;
@@ -422,6 +489,8 @@ window.addEventListener("keydown", (e) => {
     }
   } else if (e.key === "Escape") {
     selectedId = null;
+    rotateNodeId = null;
+    rotateDragging = false;
     closeBlockMenu();
   }
 });
@@ -504,6 +573,7 @@ function draw(): void {
       selectedCameraId,
       heldId: dragNodeId,
       heldNeighbours,
+      rotateId: rotateNodeId,
     },
     particles,
   );

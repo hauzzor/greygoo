@@ -66,6 +66,7 @@ export class World {
       firing: 0,
       dirX: 0,
       dirY: 0,
+      dirManual: false,
       ghost: false,
       emitting: true,
       impulse: false,
@@ -163,6 +164,9 @@ export class World {
         x: n.pos.x,
         y: n.pos.y,
         radius: n.radius,
+        dirX: n.dirX,
+        dirY: n.dirY,
+        dirManual: n.dirManual,
       });
     }
     const beams: BeamSnapshot[] = this.beams.map((b) => ({
@@ -185,8 +189,9 @@ export class World {
         radius: s.radius,
         invMass: 1,
         firing: 0,
-        dirX: 0,
-        dirY: 0,
+        dirX: s.dirX,
+        dirY: s.dirY,
+        dirManual: s.dirManual,
         ghost: false,
         emitting: true,
         impulse: false,

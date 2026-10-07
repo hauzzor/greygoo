@@ -7,6 +7,8 @@ export const CONNECT_MAX = 100;
 
 export const THRUST_DIR_MIN = 0.4;
 
+export const ROTATE_RING = 26;
+
 export function connectedComponent(world: World, startId: number): Set<number> {
   const seen = new Set<number>([startId]);
   const queue: number[] = [startId];
@@ -205,7 +207,7 @@ export function thrustDirection(world: World, id: number): Vec2 | null {
 
 export function captureThrustDirection(world: World, id: number): void {
   const node = world.nodes.get(id);
-  if (!node || node.type !== "thruster") return;
+  if (!node || node.type !== "thruster" || node.dirManual) return;
   const dir = thrustDirection(world, id);
   if (dir) {
     node.dirX = dir.x;

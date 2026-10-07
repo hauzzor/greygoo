@@ -122,13 +122,19 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   (normalized, averaged) connected-neighbour positions **captured when its
   connections change** (`captureThrustDirection`, hooked to
   `World.onTopologyChange`), then frozen — later live motion does not change it.
-  It is stored in `node.dirX/dirY` (used by physics and rendering). A thruster
-  with no neighbours has no direction, and one whose neighbours roughly cancel
-  (enclosed/looped, summed length below `THRUST_DIR_MIN` `0.4`) is treated as
-  having **no direction** rather than a noise-driven random one. When a signal
-  reaches it the thruster fires a single **impulse** along that direction, but
-  only when the incoming signal's goal direction is positively aligned with it
-  (the kick scales with that alignment and the capped power).
+  It is stored in `node.dirX/dirY` (used by physics and rendering) and shown by a
+  small arrow drawn on the block. A thruster with no neighbours has no direction,
+  and one whose neighbours roughly cancel (enclosed/looped, summed length below
+  `THRUST_DIR_MIN` `0.4`) is treated as having **no direction** rather than a
+  noise-driven random one. When a signal reaches it the thruster fires a single
+  **impulse** along that direction, but only when the incoming signal's goal
+  direction is positively aligned with it (the kick scales with that alignment
+  and the capped power).
+- **Manual rotation**: a thruster's direction can be overridden after building.
+  Its context menu offers **Rotate**, which enters rotate mode: a ring is drawn
+  around the block and dragging around it turns the thruster to face the pointer.
+  This sets `node.dirManual`, so `captureThrustDirection`/`syncThrustDirections`
+  leave the direction alone from then on (survives undo via the snapshot).
 - **Sensor** emits **signal blobs** discretely (not an instant broadcast): every
   second while running, a connected and **emitting** sensor spawns one blob onto
   **each** of its beams. A blob captures the sensor's unit vector to the goal at
@@ -165,11 +171,14 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   `Backspace` removes the selected block.
 - Click a block (select tool, no drag) to open its context menu next to it;
   click outside the menu to dismiss it.
+- A thruster's context menu has **Rotate**: selecting it enters rotate mode (a
+  ring is drawn around the thruster); drag around the ring to turn it. Click
+  outside the ring or press `Escape` to leave rotate mode.
 - Right / middle mouse drag, or Pan tool + left drag, to pan. Wheel to zoom.
 - `Space` toggles Run/Pause; `C` toggles camera lock; `Ctrl+Z` undoes.
 - **Clear** resets the scene to the initial scattered supply.
-- **New game** scatters the balanced set: ~14 Basic Cells, 5 Thrusters,
-  3 Sensors, 1 Camera.
+- **New game** scatters the balanced set: ~28 Basic Cells, 10 Thrusters,
+  6 Sensors, 2 Cameras.
 
 ## File map
 
