@@ -116,12 +116,12 @@ console.log("\n2. Global speed cap (single thruster, chain)");
     prev = cell.id;
   }
   captureThrustDirection(w, t.id);
-  t.signalTimer = 10;
   t.signalGoalX = 1;
   t.signalGoalY = 0;
 
   let peak = 0;
   for (let s = 0; s < 600; s++) {
+    t.impulse = true;
     applyGuidance(w, POWER, DT);
     w.step(DT);
     peak = Math.max(peak, maxStep(w));
@@ -151,10 +151,10 @@ console.log("\n3. MAX_THRUST forces an identical trajectory above the cap");
       prev = cell.id;
     }
     captureThrustDirection(w, t.id);
-    t.signalTimer = 100;
     t.signalGoalX = 1;
     t.signalGoalY = 0;
     for (let s = 0; s < 120; s++) {
+      t.impulse = true;
       applyGuidance(w, power, DT);
       w.step(DT);
     }
@@ -171,7 +171,7 @@ console.log("\n3. MAX_THRUST forces an identical trajectory above the cap");
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n4. Signals restart a 1s burst (no stacking)");
+console.log("\n4. Signals fire a single impulse (no sustained burn)");
 {
   const w = new World();
   setup(w);
@@ -179,26 +179,40 @@ console.log("\n4. Signals restart a 1s burst (no stacking)");
   const t = w.addNode("thruster", { x: 0, y: 0 }, RADIUS);
   const sensor = w.addNode("sensor", { x: 60, y: 0 }, RADIUS);
   connect(w, t.id, sensor.id);
-  connect(w, t.id, sensor.id);
-  connect(w, t.id, sensor.id);
   sensor.emitting = true;
   captureThrustDirection(w, t.id);
   const goal: Goal = { pos: { x: 1000, y: 0 }, radius: 72 };
 
-  let peakTimer = 0;
+  let firedFrames = 0;
+  let run = 0;
+  let maxRun = 0;
+  let peak = 0;
   for (let s = 0; s < 300; s++) {
     updateSignals(w, goal, DT);
     applyGuidance(w, POWER, DT);
+    if (t.firing > 0.01) {
+      firedFrames++;
+      run++;
+      maxRun = Math.max(maxRun, run);
+    } else {
+      run = 0;
+    }
     w.step(DT);
-    peakTimer = Math.max(peakTimer, t.signalTimer);
+    peak = Math.max(peak, maxStep(w));
   }
+  check("thruster did fire", firedFrames > 0, `firedFrames=${firedFrames}`);
   check(
-    "signalTimer never exceeds one second",
-    peakTimer <= 1 + 1e-9,
-    `peakTimer=${peakTimer.toFixed(4)}`,
+    "impulse is brief, not a sustained burn",
+    maxRun < 30,
+    `maxRun=${maxRun} frames`,
   );
-  check("thruster did fire", peakTimer > 0.9, `peakTimer=${peakTimer.toFixed(4)}`);
   check("positions stay finite", allFinite(w));
+  const cap = w.params.maxSpeed * DT;
+  check(
+    "impulse respects the global speed cap",
+    peak <= cap * 1.001,
+    `peak=${peak.toFixed(3)} cap=${cap.toFixed(3)}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -210,11 +224,11 @@ console.log("\n4b. Thruster only fires when aimed toward the goal");
   const cell = w.addNode("cell", { x: 60, y: 0 }, RADIUS);
   connect(w, t.id, cell.id);
   captureThrustDirection(w, t.id);
-  t.signalTimer = 10;
   t.signalGoalX = -1;
   t.signalGoalY = 0;
 
   for (let s = 0; s < 60; s++) {
+    t.impulse = true;
     applyGuidance(w, POWER, DT);
     w.step(DT);
   }

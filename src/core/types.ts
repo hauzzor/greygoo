@@ -15,7 +15,7 @@ export interface Node {
   dirY: number;
   ghost: boolean;
   emitting: boolean;
-  signalTimer: number;
+  impulse: boolean;
   signalGoalX: number;
   signalGoalY: number;
 }

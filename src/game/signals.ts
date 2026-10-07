@@ -6,7 +6,6 @@ import { pickGoal, stepTraveller, type Traveller } from "./travellers";
 
 export const SIGNAL_SPEED = 110;
 export const EMIT_INTERVAL = 1;
-export const SIGNAL_FIRE_TIME = 1;
 const SIGNAL_RADIUS = 6;
 const MAX_SIGNALS = 500;
 
@@ -65,7 +64,7 @@ function spawn(world: World, sensor: Node, otherId: number, gx: number, gy: numb
 }
 
 function fireThruster(node: Node, dirX: number, dirY: number): void {
-  node.signalTimer = SIGNAL_FIRE_TIME;
+  node.impulse = true;
   node.signalGoalX = dirX;
   node.signalGoalY = dirY;
 }

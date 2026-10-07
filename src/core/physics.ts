@@ -68,7 +68,7 @@ export class World {
       dirY: 0,
       ghost: false,
       emitting: true,
-      signalTimer: 0,
+      impulse: false,
       signalGoalX: 0,
       signalGoalY: 0,
     };
@@ -189,7 +189,7 @@ export class World {
         dirY: 0,
         ghost: false,
         emitting: true,
-        signalTimer: 0,
+        impulse: false,
         signalGoalX: 0,
         signalGoalY: 0,
       });

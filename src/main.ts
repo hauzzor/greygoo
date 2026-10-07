@@ -188,7 +188,7 @@ function toggleRun(): void {
   } else {
     for (const node of world.nodes.values()) {
       node.firing = 0;
-      node.signalTimer = 0;
+      node.impulse = false;
     }
     clearSignals();
   }

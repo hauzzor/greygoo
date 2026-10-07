@@ -125,17 +125,18 @@ work regardless. If it ever breaks: `npm approve-scripts esbuild`.
   It is stored in `node.dirX/dirY` (used by physics and rendering). A thruster
   with no neighbours has no direction, and one whose neighbours roughly cancel
   (enclosed/looped, summed length below `THRUST_DIR_MIN` `0.4`) is treated as
-  having **no direction** rather than a noise-driven random one. When activated
-  it thrusts **full force** along that direction (no goal weighting).
+  having **no direction** rather than a noise-driven random one. When a signal
+  reaches it the thruster fires a single **impulse** along that direction, but
+  only when the incoming signal's goal direction is positively aligned with it
+  (the kick scales with that alignment and the capped power).
 - **Sensor** emits **signal blobs** discretely (not an instant broadcast): every
   second while running, a connected and **emitting** sensor spawns one blob onto
   **each** of its beams. A blob captures the sensor's unit vector to the goal at
   emission (shown as a direction chevron) and moves beam-to-beam as a traveller
   (shortest path to a distance-weighted in-component goal). It **lives until it
-  reaches a thruster**, which it fires and then vanishes (if the component has no
-  thruster it roams indefinitely; a soft cap limits total blobs). A hit
-  **restarts** the thruster's `signalTimer` to exactly `1s` (extra hits while
-  firing do not stack or extend it). Pausing clears the blobs.
+  reaches a thruster**, which it fires once as an impulse and then vanishes (if
+  the component has no thruster it roams indefinitely; a soft cap limits total
+  blobs). Extra hits do not stack or extend anything; pausing clears the blobs.
 - **Individual sensor control**: clicking a sensor (select tool, no drag) opens
   a **context menu** next to the block; it lists that block's actions — for a
   sensor, an **Emission: On/Off** toggle that flips its `emitting` flag,
